@@ -48,27 +48,60 @@ export default {
 	},
 };
 
-function sanitizeDlbPanelIps(rawText) {
-	const lines = String(rawText || "")
+function isDlbPanelSafeAddress(value, options = {}) {
+	const allowHost = options.allowHost !== false;
+	const line = String(value || "").trim();
+	if (!line || line.length > 253) return false;
+	if (/[<>{}\[\]"'\\]/.test(line) || /\s/.test(line)) return false;
+	if (/[:\/]{2,}|\/|\?|#|&|=|,|;/.test(line)) return false;
+	if (/(?:html|head|body|script|style|div|span|meta|link|class|href|tailwind|theme|extend|charset|stylesheet|vazirmatn)/i.test(line)) return false;
+	if (/\.(?:css|js|html?|php|json|xml|svg|png|jpe?g|webp|ico)$/i.test(line)) return false;
+	const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
+	const ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(":");
+	if (ipv4 || ipv6) return true;
+	if (!allowHost) return false;
+	return /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
+}
+
+function getDlbPanelCleanAddresses(rawText, options = {}) {
+	const seen = new Set();
+	const output = [];
+	String(rawText || "")
 		.replace(/\r/g, "")
-		.split("\n")
-		.map((line) => line.trim());
+		.split(/[\n,;]+/)
+		.map((line) => line.trim())
+		.forEach((line) => {
+			if (!isDlbPanelSafeAddress(line, options)) return;
+			const key = line.toLowerCase();
+			if (seen.has(key)) return;
+			seen.add(key);
+			output.push(line);
+		});
+	return output;
+}
+
+function serializeDlbPanelCleanIps(rawText) {
+	const ips = getDlbPanelCleanAddresses(rawText, { allowHost: true });
+	return ips.length ? ips.join("\n") : null;
+}
+
+function getDlbPanelOutboundIps(rawText, fallbackHost) {
+	const ips = getDlbPanelCleanAddresses(rawText, { allowHost: true });
+	if (ips.length > 0) return ips;
+	return isDlbPanelSafeAddress(fallbackHost, { allowHost: true }) ? [fallbackHost] : [];
+}
+
+function sanitizeDlbPanelIps(rawText) {
 	const cleaned = [];
-	const isValidIpOrHost = (line) => {
-		if (!line || /[<>{}]/.test(line) || /\s/.test(line)) return false;
-		const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
-		const ipv6 = /^[0-9a-fA-F:]{3,}$/.test(line) && line.includes(":");
-		const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(line) && line.includes(".");
-		return ipv4 || ipv6 || host;
-	};
-	for (const line of lines) {
+	for (const rawLine of String(rawText || "").replace(/\r/g, "").split("\n")) {
+		const line = rawLine.trim();
 		if (!line) continue;
 		if (line.startsWith("#") || line.startsWith("----------")) {
 			cleaned.push(line);
 			continue;
 		}
 		if (line.startsWith("[source")) continue;
-		if (isValidIpOrHost(line)) cleaned.push(line);
+		if (isDlbPanelSafeAddress(line, { allowHost: true })) cleaned.push(line);
 	}
 	return cleaned.join("\n");
 }
@@ -156,7 +189,7 @@ const Router = {
 				created_at: user.created_at,
 				tls: user.tls,
 				port: user.port,
-				ips: user.ips,
+				ips: serializeDlbPanelCleanIps(user.ips),
 				fingerprint: user.fingerprint || "chrome",
 			});
 			const html = HTML_TEMPLATES.status.replace("/* {{USER_DATA_PLACEHOLDER}} */", `window.statusUser = ${userJson};`);
@@ -554,6 +587,7 @@ const Router = {
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					} else {
 						const { username: new_username, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit } = body;
+					const safeIps = serializeDlbPanelCleanIps(ips);
 						if (new_username && new_username !== username) {
 							const existing = await env.DB.prepare("SELECT id FROM users WHERE username = ?").bind(new_username).first();
 							if (existing) {
@@ -577,7 +611,7 @@ const Router = {
 							}
 						}
 						await env.DB.prepare("UPDATE users SET username = ?, limit_gb = ?, expiry_days = ?, limit_req = ?, ips = ?, tls = ?, port = ?, fingerprint = ?, max_connections = ?, ip_limit = ? WHERE username = ?")
-							.bind(new_username || username, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, username)
+							.bind(new_username || username, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, safeIps, tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, username)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					}
@@ -595,6 +629,7 @@ const Router = {
 					const now = Date.now();
 					const enrichedUsers = (results || []).map((user) => ({
 						...user,
+						ips: serializeDlbPanelCleanIps(user.ips),
 						is_online: user.last_active && now - user.last_active < 25000 ? 1 : 0,
 						online_count: getActiveIpCount(user.active_ips),
 					}));
@@ -639,6 +674,7 @@ const Router = {
 				}
 				if (request.method === "POST") {
 					const { username, uuid, limit_gb, expiry_days, limit_req, ips, tls, port, fingerprint, ip_limit, used_gb, used_req, created_at, is_active } = await request.json();
+					const safeIps = serializeDlbPanelCleanIps(ips);
 					if (!username) {
 						return new Response(JSON.stringify({ error: "نام کاربری اجباری است" }), { status: 400, headers: { "Content-Type": "application/json" } });
 					}
@@ -652,7 +688,7 @@ const Router = {
 					const finalIsActive = !isNaN(parsedIsActive) ? parsedIsActive : 1;
 					try {
 						await env.DB.prepare("INSERT INTO users (username, uuid, limit_gb, expiry_days, limit_req, ips, connection_type, tls, port, fingerprint, max_connections, ip_limit, used_gb, used_req, created_at, is_active) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, ips || null, atob("dmxlc3M="), tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive)
+							.bind(username, finalUuid, limit_gb ? parseFloat(limit_gb) : null, expiry_days ? parseInt(expiry_days) : null, limit_req ? parseInt(limit_req) : null, safeIps, atob("dmxlc3M="), tls, port, fingerprint || "chrome", ip_limit ? parseInt(ip_limit) : null, ip_limit ? parseInt(ip_limit) : null, finalUsedGb, finalUsedReq, finalCreatedAt, finalIsActive)
 							.run();
 						return new Response(JSON.stringify({ success: true }), { headers: { "Content-Type": "application/json" } });
 					} catch (err) {
@@ -773,14 +809,7 @@ function getActiveIpCount(activeIpsJson) {
 }
 const SubscriptionService = {
 	async generateText(user, host) {
-		let ips = [host];
-		if (user.ips) {
-			const parsedIps = user.ips
-				.split("\n")
-				.map((ip) => ip.trim())
-				.filter((ip) => ip.length > 0);
-			if (parsedIps.length > 0) ips = parsedIps;
-		}
+		const ips = getDlbPanelOutboundIps(user.ips, host);
 		const ports = String(user.port || "443")
 			.split(",")
 			.map((p) => p.trim())
@@ -3871,7 +3900,7 @@ function closeFreePanelWarning() {
             const host = window.location.hostname;
             let ips = [host];
             if (user.ips) {
-                const parsedIps = user.ips.split('\\n').map(ip => ip.trim()).filter(ip => ip.length > 0);
+                const parsedIps = user.ips.split('\\n').map(ip => ip.trim()).filter(isDlbPanelValidIpLine);
                 if (parsedIps.length > 0) ips = parsedIps;
             }
             const ports = String(user.port || '443').split(',').map(p => p.trim()).filter(p => p.length > 0);
@@ -4369,12 +4398,16 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
         }
 let cachedIpsData = {};
 function isDlbPanelValidIpLine(line) {
-    if (!line) return false;
-    if (/[<>{}]/.test(line)) return false;
+    line = String(line || '').trim();
+    if (!line || line.length > 253) return false;
+    if (/[<>{}\[\]"'\\]/.test(line)) return false;
     if (/\s/.test(line)) return false;
+    if (/[:\/]{2,}|\/|\?|#|&|=|,|;/.test(line)) return false;
+    if (/(?:html|head|body|script|style|div|span|meta|link|class|href|tailwind|theme|extend|charset|stylesheet|vazirmatn)/i.test(line)) return false;
+    if (/\.(?:css|js|html?|php|json|xml|svg|png|jpe?g|webp|ico)$/i.test(line)) return false;
     const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
-    const ipv6 = /^[0-9a-fA-F:]{3,}$/.test(line) && line.includes(':');
-    const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(line) && line.includes('.');
+    const ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(':');
+    const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
     return ipv4 || ipv6 || host;
 }
 async function fetchIpsList() {
@@ -4681,12 +4714,25 @@ document.addEventListener('DOMContentLoaded', () => {
         function getHost() {
             return window.location.host;
         }
+        function isDlbPanelValidIpLine(line) {
+            line = String(line || '').trim();
+            if (!line || line.length > 253) return false;
+            if (/[<>{}\[\]"'\\]/.test(line)) return false;
+            if (/\s/.test(line)) return false;
+            if (/[:\/]{2,}|\/|\?|#|&|=|,|;/.test(line)) return false;
+            if (/(?:html|head|body|script|style|div|span|meta|link|class|href|tailwind|theme|extend|charset|stylesheet|vazirmatn)/i.test(line)) return false;
+            if (/\.(?:css|js|html?|php|json|xml|svg|png|jpe?g|webp|ico)$/i.test(line)) return false;
+            var ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
+            var ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(':');
+            var host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
+            return ipv4 || ipv6 || host;
+        }
         function getVlessLink() {
             const u = window.statusUser;
             const host = getHost();
             var ips = [host];
             if (u.ips) {
-                ips = u.ips.split('\\n').map(function(ip) { return ip.trim(); }).filter(function(ip) { return ip.length > 0; });
+                ips = u.ips.split('\\n').map(function(ip) { return ip.trim(); }).filter(isDlbPanelValidIpLine);
                 if (ips.length === 0) ips = [host];
             }
             var ports = String(u.port || '443').split(',').map(function(p) { return p.trim(); }).filter(function(p) { return p.length > 0; });
