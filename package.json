@@ -4,7 +4,7 @@
   "private": false,
   "type": "module",
   "description": "DLB Panel custom Cloudflare Workers project builder",
-"scripts": {
+  "scripts": {
     "build": "node scripts/build-dlb-panel.mjs",
     "verify": "node scripts/verify-dlb-output.mjs",
     "prepare:github": "npm run build && npm run verify",

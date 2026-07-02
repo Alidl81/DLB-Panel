@@ -50,8 +50,8 @@ function replaceAllLiteral(input, from, to) {
 function basicBranding(code) {
   let out = code;
 
-  const rawGithubPanel = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/zeus.js`;
-  const rawGithubPanelAlt = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/zeus.js`;
+  const rawGithubPanel = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/dist/zeus.js`;
+  const rawGithubPanelAlt = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/dist/zeus.js`;
 
   const replacements = [
     ["ZEUS Panel", config.brandName],

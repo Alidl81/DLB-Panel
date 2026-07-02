@@ -1,4 +1,11 @@
-name = "dlbpanel"
-main = "dist/dlb-deployer.js"
+name = "dlb-panel"
+main = "zeus.js"
 compatibility_date = "2024-02-08"
 workers_dev = true
+
+# این فایل نمونه مربوط به دیپلوی دستی پنل اصلی است.
+# اگر از Deployer استفاده می‌کنی، لازم نیست D1 را دستی بسازی؛ Deployer خودش D1 و Worker اصلی را می‌سازد.
+[[d1_databases]]
+binding = "DB"
+database_name = "dlb-db"
+database_id = "PUT_YOUR_D1_DATABASE_ID_HERE"
