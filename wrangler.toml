@@ -1,0 +1,16 @@
+name = "dlb-panel"
+main = "dlbpanel.js"
+compatibility_date = "2024-02-08"
+workers_dev = true
+
+# DLB Panel expects a D1 binding named DB.
+# If you already configured the DB binding in the Cloudflare dashboard, keep this section commented.
+# If you deploy with Wrangler and want config-as-code, create a D1 database and uncomment/fill this:
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "dlbpanel-db"
+# database_id = "PUT_YOUR_D1_DATABASE_ID_HERE"
+
+# Optional secrets expected by the in-panel updater/restart features:
+# CF_API_TOKEN
+# CF_ACCOUNT_ID
