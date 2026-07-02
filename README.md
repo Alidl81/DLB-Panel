@@ -84,3 +84,17 @@ https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dlbpanel.js
 ```
 
 اما آپدیت IPها فقط از لینک blob مشخص‌شده‌ی IR-NETLIFY انجام می‌شود و هیچ فایل/مسیر دیگری برای IPها استفاده نمی‌شود.
+
+## نکته مهم درباره IPها
+
+در این نسخه منبع IP فقط این لینک است:
+
+```txt
+https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt
+```
+
+Worker این لینک نمایشی GitHub را فقط داخل سرور به raw تبدیل می‌کند تا HTML صفحه GitHub وارد IPها نشود. اگر قبلاً HTML داخل دیتابیس ذخیره شده باشد، Worker در اولین اجرا آن را از فیلد IP کاربران پاک‌سازی می‌کند. همچنین endpoint زیر برای پاک‌سازی دستی وجود دارد:
+
+```txt
+POST /api/clean-stored-ips
+```

@@ -118,6 +118,20 @@ function sanitizeDlbPanelIps(rawText) {
 	}
 	return cleaned.join("\n");
 }
+
+async function cleanStoredDlbPanelIps(db) {
+	try {
+		const { results } = await db.prepare("SELECT id, ips FROM users WHERE ips IS NOT NULL AND ips != ''").all();
+		for (const row of results || []) {
+			const original = String(row.ips || "");
+			const cleaned = serializeDlbPanelCleanIps(original);
+			if ((cleaned || "") !== original) {
+				await db.prepare("UPDATE users SET ips = ? WHERE id = ?").bind(cleaned, row.id).run();
+			}
+		}
+	} catch (e) {}
+}
+
 const Router = {
 	isWebSocketUpgrade(request) {
 		const upgradeHeader = (request.headers.get("Upgrade") || "").toLowerCase();
@@ -373,6 +387,19 @@ const Router = {
 			} catch (err) {
 				return new Response(JSON.stringify({ error: err.message || "Failed to load clean IP list" }), {
 					status: 502,
+					headers: { "Content-Type": "application/json; charset=utf-8" },
+				});
+			}
+		}
+		if (url.pathname === "/api/clean-stored-ips" && request.method === "POST") {
+			try {
+				await cleanStoredDlbPanelIps(env.DB);
+				return new Response(JSON.stringify({ success: true }), {
+					headers: { "Content-Type": "application/json; charset=utf-8", "Cache-Control": "no-store" },
+				});
+			} catch (err) {
+				return new Response(JSON.stringify({ error: err.message || "Failed to clean stored IPs" }), {
+					status: 500,
 					headers: { "Content-Type": "application/json; charset=utf-8" },
 				});
 			}
@@ -777,6 +804,7 @@ const DbService = {
 		try {
 			await db.prepare("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)").run();
 		} catch (e) {}
+		await cleanStoredDlbPanelIps(db);
 		schemaEnsured = true;
 	},
 	async getPanelPassword(db) {
@@ -4431,9 +4459,13 @@ function isDlbPanelValidIpLine(line) {
 }
 async function fetchIpsList() {
     try {
-        const response = await fetch('/api/clean-ips', { cache: 'no-store' });
-        if (!response.ok) throw new Error('Fetch failed');
+        const response = await fetch('/api/clean-ips?t=' + Date.now(), { cache: 'no-store' });
+        const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
+        if (!response.ok) throw new Error('Fetch failed');
+        if (/text\/html/i.test(contentType) || /<(?:!doctype|html|head|body|script|style|link|meta|div|p|button)\b/i.test(text) || /(?:برای ورود به پنل|ورود به پنل|fontFamily|tailwind|extend\s*:|theme\s*:|Vazirmatn)/i.test(text)) {
+            throw new Error('HTML received instead of ips.txt');
+        }
         const blocks = text.split('----------');
         cachedIpsData = {};
         blocks.forEach(block => {
@@ -4455,7 +4487,7 @@ async function fetchIpsList() {
         if (Object.keys(cachedIpsData).length === 0) throw new Error('Empty list');
         populateIpSelect();
     } catch (err) {
-        alert('لیست IP معتبر دریافت نشد. لطفاً بعد از آپدیت Worker دوباره تلاش کنید.');
+        alert('لیست IP معتبر دریافت نشد. اگر متن HTML دیدی یعنی Worker هنوز نسخه قدیمی را اجرا می‌کند یا مسیر /api/clean-ips به پنل برمی‌گردد.');
         toggleIpSelectorModal(false);
     }
 }
