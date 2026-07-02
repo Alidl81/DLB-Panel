@@ -2,4 +2,3 @@ name = "dlbpanel"
 main = "dist/dlb-deployer.js"
 compatibility_date = "2024-02-08"
 workers_dev = true
-

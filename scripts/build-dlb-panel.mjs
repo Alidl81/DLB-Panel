@@ -50,8 +50,8 @@ function replaceAllLiteral(input, from, to) {
 function basicBranding(code) {
   let out = code;
 
-  const rawGithubPanel = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/dist/zeus.js`;
-  const rawGithubPanelAlt = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/dist/zeus.js`;
+const rawGithubPanel = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/dist/zeus.js`;
+const rawGithubPanelAlt = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/dist/zeus.js`;
 
   const replacements = [
     ["ZEUS Panel", config.brandName],
@@ -136,6 +136,41 @@ function patchDeployerSpecific(code) {
   return out;
 }
 
+
+function replaceOnceOrThrow(input, pattern, replacement, label) {
+  const next = input.replace(pattern, replacement);
+  if (next === input) {
+    throw new Error(`Could not embed panel source in deployer: ${label} pattern not found`);
+  }
+  return next;
+}
+
+function embedPanelSourceIntoDeployer(code, panelCode) {
+  let out = code;
+
+  out = replaceOnceOrThrow(
+    out,
+    /const githubRes = await fetch\("https:\/\/raw\.githubusercontent\.com\/[^"]+\/zeus\.js\?t=" \+ Date\.now\(\)\);\s*if \(!githubRes\.ok\) throw new Error\("خطا در دریافت سورس از گیت‌هاب\."\);\s*const zeusCode = await githubRes\.text\(\);/,
+    "const zeusCode = DLB_PANEL_SOURCE;",
+    "initial deploy source fetch"
+  );
+
+  out = replaceOnceOrThrow(
+    out,
+    /const githubRes = await fetch\("https:\/\/raw\.githubusercontent\.com\/[^"]+\/zeus\.js\?t=" \+ Date\.now\(\)\);\s*if \(!githubRes\.ok\) throw new Error\("Failed to fetch source from GitHub"\);\s*const newCode = await githubRes\.text\(\);/,
+    "const newCode = DLB_PANEL_SOURCE;",
+    "update source fetch"
+  );
+
+  const latestVersionPattern = /let latestVersion = "Unknown"; try \{ const ghRes = await fetch\("https:\/\/raw\.githubusercontent\.com\/[^"]+\/zeus\.js\?t=" \+ Date\.now\(\)\); if \(ghRes\.ok\) \{ const ghText = await ghRes\.text\(\); const match = ghText\.match\(\/CURRENT_VERSION\\s\*\=\\s\*\['"\]\(\[0-9\\\.\]\+\)\['"\]\/i\); if \(match && match\[1\]\) latestVersion = "v" \+ match\[1\]; \} \} catch \(e\) \{\}/;
+  out = out.replace(
+    latestVersionPattern,
+    `let latestVersion = "Unknown"; try { const ghText = DLB_PANEL_SOURCE; const match = ghText.match(/CURRENT_VERSION\\s*=\\s*['"]([0-9\\.]+)['"]/i); if (match && match[1]) latestVersion = "v" + match[1]; } catch (e) {}`
+  );
+
+  return `const DLB_PANEL_SOURCE = ${JSON.stringify(panelCode)};\n${out}`;
+}
+
 function assertNoPanelForbidden(text, filename) {
   const forbidden = [
     "رایگان",
@@ -157,7 +192,8 @@ const panelSource = await fetchOrRead("zeus.js", config.upstream.panel);
 const deployerSource = await fetchOrRead("zeus deployer.js", config.upstream.deployer);
 
 const panelOut = patchPanelSpecific(panelSource);
-const deployerOut = patchDeployerSpecific(deployerSource);
+let deployerOut = patchDeployerSpecific(deployerSource);
+deployerOut = embedPanelSourceIntoDeployer(deployerOut, panelOut);
 
 assertNoPanelForbidden(panelOut, "zeus.js");
 assertNoPanelForbidden(deployerOut, "dlb-deployer.js");
