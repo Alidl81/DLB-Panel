@@ -2370,7 +2370,7 @@ login: `<!DOCTYPE html>
             <div class="flex flex-row flex-wrap justify-center items-center gap-3 w-full md:w-auto">
                 <h1 class="text-lg font-bold flex items-center gap-2" dir="ltr">
                     DLB Panel 
-                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.10</span>
+                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.11-raw-ips</span>
                 </h1>
                 <div class="flex items-center gap-3 bg-gray-100 dark:bg-zinc-800/60 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800/80 shadow-sm flex-shrink-0 w-fit">
                     <a href="https://github.com/Alidl81/DLB-Panel" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="GitHub">
@@ -3380,6 +3380,7 @@ login: `<!DOCTYPE html>
                 document.getElementById('submit-btn').innerText = 'ایجاد کاربر';
                 document.getElementById('input-name').disabled = false;
                 document.getElementById('create-user-form').reset();
+                document.getElementById('input-ips').value = '';
                 // بازگردانی پورت‌های 443 و 80 به حالت پیش‌فرض
                 const cb443 = document.querySelector('input[name="ports"][value="443"]');
                 if (cb443) cb443.checked = true;
@@ -3415,6 +3416,7 @@ login: `<!DOCTYPE html>
             document.getElementById('submit-btn').innerText = 'ایجاد کاربر';
             document.getElementById('input-name').disabled = false;
             document.getElementById('create-user-form').reset();
+            document.getElementById('input-ips').value = '';
             // اطمینان از اعمال پیش‌فرض‌ها در زمان باز شدن فرم جدید
             const cb443 = document.querySelector('input[name="ports"][value="443"]');
             if (cb443) cb443.checked = true;
@@ -3882,7 +3884,7 @@ async function resetUserData(encodedUsername, actionType) {
             }
             const port = checkedPorts.join(',');
             const tls = checkedPorts.some(p => tlsPorts.includes(p)) ? 'on' : 'off';
-            const ips = document.getElementById('input-ips').value;
+            const ips = cleanDlbPanelTextareaIps(document.getElementById('input-ips').value);
             const fingerprint = document.getElementById('fingerprint-select').value;
             const url = isEditMode ? '/api/users/' + encodeURIComponent(editingUsername) : '/api/users';
             const method = isEditMode ? 'PUT' : 'POST';
@@ -4046,7 +4048,7 @@ function editUser(encodedUsername) {
     document.getElementById('input-expiry').value = user.expiry_days || '';
     document.getElementById('input-req-limit').value = user.limit_req || '';
     document.getElementById('input-ip-limit').value = user.ip_limit !== undefined ? (user.ip_limit || '') : (user.max_connections || '');
-    document.getElementById('input-ips').value = user.ips || '';
+    document.getElementById('input-ips').value = cleanDlbPanelTextareaIps(user.ips || '');
     document.getElementById('fingerprint-select').value = user.fingerprint || 'chrome';
     const userPorts = String(user.port || '').split(',').map(p => p.trim());
     document.querySelectorAll('input[name="ports"]').forEach(cb => {
@@ -4445,60 +4447,83 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
         }
 let cachedIpsData = {};
 const DLBPANEL_IPS_GITHUB_BLOB_URL = 'https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt';
-const DLBPANEL_IPS_GITHUB_RAW_URL = DLBPANEL_IPS_GITHUB_BLOB_URL
-    .replace('https://github.com/', 'https://raw.githubusercontent.com/')
-    .replace('/blob/', '/');
+const DLBPANEL_IPS_GITHUB_RAW_URL = 'https://raw.githubusercontent.com/IR-NETLIFY/zeus/main/ips.txt';
+
+function isDlbPanelHtmlText(text) {
+    return /<(?:!doctype|html|head|body|script|style|link|meta|div|p|button|span|svg)\b/i.test(String(text || '')) ||
+        /(?:برای ورود به پنل|ورود به پنل|tailwind\.config|fontFamily|darkMode|theme\s*:|extend\s*:|Vazirmatn)/i.test(String(text || ''));
+}
+
 function isDlbPanelValidIpLine(line) {
     line = String(line || '').trim();
     if (!line || line.length > 253) return false;
     if (/[<>{}\[\]"'\\]/.test(line)) return false;
     if (/\s/.test(line)) return false;
+    if (/(?:html|head|body|script|style|div|span|meta|link|class|href|tailwind|theme|extend|charset|stylesheet|vazirmatn|button|panel)/i.test(line)) return false;
     if (/[:\/]{2,}|\/|\?|#|&|=|,|;/.test(line)) return false;
-    if (/(?:html|head|body|script|style|div|span|meta|link|class|href|tailwind|theme|extend|charset|stylesheet|vazirmatn)/i.test(line)) return false;
-    if (/\.(?:css|js|html?|php|json|xml|svg|png|jpe?g|webp|ico)$/i.test(line)) return false;
     const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
     const ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(':');
     const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
     return ipv4 || ipv6 || host;
 }
+
+function cleanDlbPanelTextareaIps(value) {
+    const seen = new Set();
+    const out = [];
+    String(value || '').replace(/\r/g, '').split(/[\n,;]+/).forEach(raw => {
+        const line = raw.trim();
+        if (!isDlbPanelValidIpLine(line)) return;
+        const key = line.toLowerCase();
+        if (seen.has(key)) return;
+        seen.add(key);
+        out.push(line);
+    });
+    return out.join('\n');
+}
+
 async function fetchIpsList() {
+    const ipBox = document.getElementById('input-ips');
+    // اگر از دفعات قبلی HTML داخل فیلد مانده، همان لحظه پاکش کن.
+    if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
     try {
-        // فقط از فایل ips.txt همان ریپوی خواسته‌شده می‌خوانیم.
-        // لینک blob صفحه HTML گیت‌هاب است؛ برای دریافت متن خام باید معادل raw همان فایل خوانده شود.
+        // فقط و فقط متن خام همین فایل GitHub خوانده می‌شود؛ هیچ مسیر داخلی پنل/Worker استفاده نمی‌شود.
         const response = await fetch(DLBPANEL_IPS_GITHUB_RAW_URL + '?t=' + Date.now(), {
             cache: 'no-store',
             redirect: 'follow',
-            headers: { 'Accept': 'text/plain,*/*;q=0.1' }
+            headers: { 'Accept': 'text/plain' }
         });
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
-        if (!response.ok) throw new Error('GitHub fetch failed');
-        if (/text\/html/i.test(contentType) || /<(?:!doctype|html|head|body|script|style|link|meta|div|p|button)\b/i.test(text) || /(?:برای ورود به پنل|ورود به پنل|fontFamily|tailwind|extend\s*:|theme\s*:|Vazirmatn)/i.test(text)) {
+        if (!response.ok) throw new Error('GitHub fetch failed: ' + response.status);
+        if (/text\/html/i.test(contentType) || isDlbPanelHtmlText(text)) {
             throw new Error('GitHub returned HTML instead of ips.txt');
         }
-        const blocks = text.replace(/\r/g, '').split('----------');
+        const lines = text.replace(/\r/g, '').split('\n').map(l => l.trim());
         cachedIpsData = {};
-        blocks.forEach(block => {
-            const lines = block.trim().split('\n').map(l => l.trim()).filter(l => l.length > 0);
-            if (lines.length === 0) return;
-            let opName = "Unknown";
-            const ips = [];
-            lines.forEach(line => {
-                if (line.startsWith('#')) {
-                    opName = line.replace(/^#+/, '').trim() || opName;
-                } else if (!line.startsWith('[source') && isDlbPanelValidIpLine(line)) {
-                    ips.push(line);
-                }
-            });
-            if (ips.length > 0) {
-                cachedIpsData[opName] = [...new Set(ips)];
+        let opName = 'All';
+        for (const line of lines) {
+            if (!line) continue;
+            if (line.startsWith('#')) {
+                opName = line.replace(/^#+/, '').trim() || opName;
+                if (!cachedIpsData[opName]) cachedIpsData[opName] = [];
+                continue;
             }
+            if (line.startsWith('----------') || line.startsWith('[source')) continue;
+            if (!isDlbPanelValidIpLine(line)) continue;
+            if (!cachedIpsData[opName]) cachedIpsData[opName] = [];
+            cachedIpsData[opName].push(line);
+        }
+        Object.keys(cachedIpsData).forEach(key => {
+            cachedIpsData[key] = [...new Set(cachedIpsData[key])];
+            if (cachedIpsData[key].length === 0) delete cachedIpsData[key];
         });
-        if (Object.keys(cachedIpsData).length === 0) throw new Error('Empty GitHub IP list');
+        if (Object.keys(cachedIpsData).length === 0) throw new Error('No valid IPs in ips.txt');
         populateIpSelect();
     } catch (err) {
-        alert('لیست IP از GitHub دریافت نشد. فقط این فایل خوانده می‌شود: ' + DLBPANEL_IPS_GITHUB_BLOB_URL);
+        if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
+        alert('دریافت IP از GitHub ناموفق بود. فقط این فایل خوانده می‌شود:\n' + DLBPANEL_IPS_GITHUB_BLOB_URL + '\n\nخطا: ' + (err.message || err));
         toggleIpSelectorModal(false);
+        throw err;
     }
 }
 
@@ -4528,12 +4553,18 @@ function toggleIpSelectorModal(show) {
     }
 }
 async function openIpSelectorModal() {
+    const ipBox = document.getElementById('input-ips');
+    if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
     toggleIpSelectorModal(true);
     document.getElementById('ip-loading-state').classList.remove('hidden');
     document.getElementById('ip-selection-form').classList.add('hidden');
-    await fetchIpsList();
-    document.getElementById('ip-loading-state').classList.add('hidden');
-    document.getElementById('ip-selection-form').classList.remove('hidden');
+    try {
+        await fetchIpsList();
+        document.getElementById('ip-loading-state').classList.add('hidden');
+        document.getElementById('ip-selection-form').classList.remove('hidden');
+    } catch (e) {
+        document.getElementById('ip-loading-state').classList.add('hidden');
+    }
 }
 function applySelectedIps() {
     const operator = document.getElementById('ip-operator-select').value;
@@ -4541,13 +4572,11 @@ function applySelectedIps() {
     if (isNaN(count) || count < 1) count = 10;
     let availableIps = [];
     if (operator === 'all') {
-        Object.values(cachedIpsData).forEach(ips => {
-            availableIps = availableIps.concat(ips);
-        });
+        Object.values(cachedIpsData).forEach(ips => { availableIps = availableIps.concat(ips); });
     } else {
         availableIps = cachedIpsData[operator] || [];
     }
-    availableIps = [...new Set(availableIps)];
+    availableIps = [...new Set(availableIps)].filter(isDlbPanelValidIpLine);
     let selectedIps = [];
     if (count >= availableIps.length) {
         selectedIps = availableIps;
@@ -4559,7 +4588,7 @@ function applySelectedIps() {
         }
         selectedIps = shuffled.slice(0, count);
     }
-    document.getElementById('input-ips').value = selectedIps.join('\\n');
+    document.getElementById('input-ips').value = selectedIps.join('\n');
     toggleIpSelectorModal(false);
 }
 document.addEventListener('DOMContentLoaded', () => {
