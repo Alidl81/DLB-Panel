@@ -31,7 +31,7 @@
 منبع آپدیت Clean IP دقیقاً طبق درخواست، فقط از این مسیر خوانده می‌شود:
 
 ```txt
-https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt
+https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt
 ```
 
 ## فایل‌های مهم
@@ -40,7 +40,6 @@ https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt
 |---|---|
 | `dlbpanel.js` | Worker اصلی پنل |
 | `dlbpanel-deployer.js` | Deployer اختیاری برای ساخت Worker و D1 از طریق توکن Cloudflare |
-| `dlbpanel-ips.txt` | کپی کمکی/آفلاین از لیست IP؛ آپدیت درون پنل همچنان از لینک بالا انجام می‌شود |
 | `wrangler.toml` | تنظیمات Cloudflare Worker برای دیپلوی Git/CLI |
 | `package.json` | اسکریپت‌های ساده برای deploy/dev/check |
 | `photos/dlbpanel-*.png` | تصاویر مستندات با نام DLB Panel |
@@ -67,7 +66,7 @@ https://github.com/Alidl81/DLB-Panel
 
 ## اصلاح رفتار IP و مسیر پنل
 
-در این نسخه اگر آدرس اصلی Worker را بدون مسیر باز کنید، مستقیم به `/panel` منتقل می‌شوید. همچنین دریافت Clean IP از داخل خود Worker و مسیر `/api/clean-ips` انجام می‌شود تا اگر GitHub به‌جای فایل خام، HTML یا متن نامعتبر برگرداند، آن خطوط وارد لیست IP کاربران نشود. منبع اصلی همچنان همان فایل `IR-NETLIFY/zeus/ips.txt` است.
+در این نسخه اگر آدرس اصلی Worker را بدون مسیر باز کنید، مستقیم به `/panel` منتقل می‌شوید. همچنین دریافت Clean IP از داخل خود Worker و مسیر `/api/clean-ips` انجام می‌شود. منبع پنل فقط لینک `https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt` است؛ Worker همین لینک blob را به raw تبدیل می‌کند تا به‌جای HTML صفحه GitHub، فقط متن واقعی `ips.txt` خوانده شود.
 
 ## مسیرهای اصلی
 
@@ -84,4 +83,4 @@ https://github.com/Alidl81/DLB-Panel
 https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dlbpanel.js
 ```
 
-اما آپدیت IPها فقط از منبع مشخص‌شده‌ی IR-NETLIFY انجام می‌شود.
+اما آپدیت IPها فقط از لینک blob مشخص‌شده‌ی IR-NETLIFY انجام می‌شود و هیچ فایل/مسیر دیگری برای IPها استفاده نمی‌شود.

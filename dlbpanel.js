@@ -10,6 +10,19 @@ let GLOBAL_REQ_COUNT = 0;
 let GLOBAL_LAST_REQ_WRITE = 0;
 const DNS_CACHE_TTL = 5 * 60 * 1000;
 const DOH_RESOLVER = "https://cloudflare-dns.com/dns-query";
+const DLBPANEL_IPS_SOURCE_URL = "https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt";
+
+function getDlbPanelIpsRawSourceUrl() {
+	// The panel is pinned to the GitHub blob URL requested by the owner,
+	// but Workers must fetch the raw file, not GitHub's HTML viewer page.
+	return DLBPANEL_IPS_SOURCE_URL
+		.replace("https://github.com/", "https://raw.githubusercontent.com/")
+		.replace("/blob/", "/");
+}
+
+function isDlbPanelHtmlResponse(text, contentType = "") {
+	return /text\/html/i.test(String(contentType || "")) || /<(?:!doctype|html|head|body|script|style|div|link|meta|button|p)\b/i.test(String(text || ""));
+}
 const UPSTREAM_BUNDLE_TARGET_BYTES = 16 * 1024;
 const UPSTREAM_QUEUE_MAX_BYTES = 16 * 1024 * 1024;
 const UPSTREAM_QUEUE_MAX_ITEMS = 4096;
@@ -331,7 +344,9 @@ const Router = {
 		}
 		if (url.pathname === "/api/clean-ips" && request.method === "GET") {
 			try {
-				const ipsResponse = await fetch("https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt?t=" + Date.now(), {
+				const ipsSourceUrl = DLBPANEL_IPS_SOURCE_URL;
+				const ipsFetchUrl = getDlbPanelIpsRawSourceUrl() + "?t=" + Date.now();
+				const ipsResponse = await fetch(ipsFetchUrl, {
 					headers: {
 						"Accept": "text/plain,*/*",
 						"Cache-Control": "no-cache, no-store, must-revalidate",
@@ -339,8 +354,11 @@ const Router = {
 						"Expires": "0",
 					},
 				});
-				if (!ipsResponse.ok) throw new Error("Failed to fetch IP list");
+				if (!ipsResponse.ok) throw new Error("Failed to fetch IP list from the pinned source");
 				const rawText = await ipsResponse.text();
+				if (isDlbPanelHtmlResponse(rawText, ipsResponse.headers.get("Content-Type"))) {
+					throw new Error("The pinned IP source returned HTML instead of ips.txt");
+				}
 				const cleanText = sanitizeDlbPanelIps(rawText);
 				const ipLikeCount = cleanText.split("\n").filter((line) => line && !line.startsWith("#") && !line.startsWith("----------")).length;
 				if (ipLikeCount === 0) throw new Error("Fetched file did not contain valid IP/host entries");
@@ -349,6 +367,7 @@ const Router = {
 						"Content-Type": "text/plain; charset=utf-8",
 						"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
 						"X-Content-Type-Options": "nosniff",
+						"X-DLBPanel-IP-Source": ipsSourceUrl,
 					},
 				});
 			} catch (err) {
