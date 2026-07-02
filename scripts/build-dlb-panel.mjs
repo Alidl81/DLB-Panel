@@ -18,7 +18,7 @@ const encodedOriginalPath = encodeURIComponent("/" + ORIGINAL_WS_PATH);
 const encodedNewPath = encodeURIComponent("/" + config.websocketPath);
 
 function assertConfig() {
-  const required = ["brandName", "ownerName", "telegramUsername", "workerPrefix", "dbPrefix", "websocketPath"];
+  const required = ["brandName", "ownerName", "telegramUsername", "workerPrefix", "dbPrefix", "websocketPath", "githubOwner", "githubRepo"];
   for (const key of required) {
     if (!config[key] || typeof config[key] !== "string") {
       throw new Error(`Missing required config key: ${key}`);
@@ -26,6 +26,15 @@ function assertConfig() {
   }
   if (config.telegramUsername.startsWith("@")) {
     config.telegramUsername = config.telegramUsername.slice(1);
+  }
+  if (!/^[a-z0-9][a-z0-9-]{1,62}$/i.test(config.workerPrefix)) {
+    throw new Error("workerPrefix must be a valid Cloudflare Worker name prefix");
+  }
+  if (!/^[a-z0-9][a-z0-9-]{1,62}$/i.test(config.dbPrefix)) {
+    throw new Error("dbPrefix must be a valid D1 database name prefix");
+  }
+  if (!/^[A-Za-z0-9_/-]+$/.test(config.websocketPath)) {
+    throw new Error("websocketPath should only contain letters, numbers, underscore, dash, or slash");
   }
 }
 
@@ -47,13 +56,26 @@ function replaceAllLiteral(input, from, to) {
   return input.split(from).join(to);
 }
 
+function githubRawUrl(file, refStyle = "refs") {
+  const branchPart = refStyle === "refs" ? "refs/heads/main" : "main";
+  return `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/${branchPart}/dist/${file}`;
+}
+
 function basicBranding(code) {
   let out = code;
 
-const rawGithubPanel = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/dist/zeus.js`;
-const rawGithubPanelAlt = `https://raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/dist/zeus.js`;
+  const rawGithubPanel = githubRawUrl("zeus.js", "refs");
+  const rawGithubPanelAlt = githubRawUrl("zeus.js", "main");
+  const rawGithubIps = githubRawUrl("ips.txt", "refs");
+  const rawGithubIpsAlt = githubRawUrl("ips.txt", "main");
 
+  // Keep full raw URLs before the generic owner/repo replacement. Otherwise
+  // the deployer tries to fetch /zeus.js from repository root and fails on Cloudflare.
   const replacements = [
+    ["https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/zeus.js", rawGithubPanel],
+    ["https://raw.githubusercontent.com/IR-NETLIFY/zeus/main/zeus.js", rawGithubPanelAlt],
+    ["https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt", rawGithubIps],
+    ["https://raw.githubusercontent.com/IR-NETLIFY/zeus/main/ips.txt", rawGithubIpsAlt],
     ["ZEUS Panel", config.brandName],
     ["Zeus Panel", config.brandName],
     ["zeus panel", config.brandName.toLowerCase()],
@@ -81,9 +103,7 @@ const rawGithubPanelAlt = `https://raw.githubusercontent.com/${config.githubOwne
     ["روزانه 10 الی 100 گیگ کانفیگ رایگان", "نصب و مدیریت اختصاصی کانفیگ‌ها"],
     ["این پنل کاملاً اختصاصی است. هرگونه فروش پنل یا کانفیگ‌های آن اوج بی شرفی و بی ناموسی است. لطفاً از این ابزار فقط به صورت شخصی و اختصاصی استفاده کنید.", "استفاده از این پنل تابع شرایط مالک پنل و قوانین سرویس‌دهنده است."],
     ["این پنل کاملاً رایگان است. هرگونه فروش پنل یا کانفیگ‌های آن اوج بی شرفی و بی ناموسی است. لطفاً از این ابزار فقط به صورت شخصی و رایگان استفاده کنید.", "استفاده از این پنل تابع شرایط مالک پنل و قوانین سرویس‌دهنده است."],
-    ["این توکن متعلق به صاحب پنل نیست (ای کــثـــکـــش)", "این توکن متعلق به صاحب پنل نیست."],
-    ["https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/zeus.js", rawGithubPanel],
-    ["https://raw.githubusercontent.com/IR-NETLIFY/zeus/main/zeus.js", rawGithubPanelAlt]
+    ["این توکن متعلق به صاحب پنل نیست (ای کــثـــکـــش)", "این توکن متعلق به صاحب پنل نیست."]
   ];
 
   for (const [from, to] of replacements) {
@@ -124,51 +144,37 @@ function patchPanelSpecific(code) {
   return out;
 }
 
-function patchDeployerSpecific(code) {
+function patchDeployerSpecific(code, panelOut) {
   let out = basicBranding(code);
 
   out = out.replace(/const workerName = `[^`]*\$\{uniqueSuffix\}`;/, `const workerName = \`${config.workerPrefix}-\${uniqueSuffix}\`;`);
   out = out.replace(/const dbName = `[^`]*\$\{uniqueSuffix\}`;/, `const dbName = \`${config.dbPrefix}-\${uniqueSuffix}\`;`);
   out = out.replace(/const newSub = `[^`]*\$\{Math\.random\(\)\.toString\(36\)\.substring\(2, 8\)\}`;/, `const newSub = \`dlb-\${Math.random().toString(36).substring(2, 8)}\`;`);
   out = out.replace(/script\.id\.startsWith\("zeus-panel"\)/g, `script.id.startsWith("${config.workerPrefix}")`);
-  out = out.replace(/script\.id\.startsWith\("ez-"\)/g, `script.id.startsWith("${config.workerPrefix}")`);
+  out = out.replace(/\s*\|\|\s*script\.id\.startsWith\("ez-"\)/g, "");
+
+  // Runtime GitHub fetches were the cause of the Cloudflare error when dist/zeus.js
+  // was not present at repository root. Bundle the generated panel source directly
+  // into the deployer so install and update work even if GitHub raw is unavailable.
+  const helper = `const BUNDLED_DLB_PANEL_SOURCE = ${JSON.stringify(panelOut)};\nfunction getBundledPanelSource(request) {\n\tlet source = BUNDLED_DLB_PANEL_SOURCE;\n\tif (request) {\n\t\tconst origin = new URL(request.url).origin;\n\t\tsource = source.split("https://YOUR_DEPLOYER_WORKER.workers.dev").join(origin);\n\t}\n\treturn source;\n}\nfunction getBundledPanelVersion() {\n\tconst match = BUNDLED_DLB_PANEL_SOURCE.match(/CURRENT_VERSION\\s*=\\s*['\"]([^'\"]+)['\"]/i);\n\treturn match && match[1] ? "v" + match[1] : "Unknown";\n}\n\n`;
+  out = out.replace(/^export default\s*\{/, helper + "export default {");
+
+  out = out.replace(
+    /const githubRes = await fetch\([^;]+;\s*if \(!githubRes\.ok\) throw new Error\("خطا در دریافت سورس از گیت‌هاب\."\);\s*const zeusCode = await githubRes\.text\(\);/m,
+    "const zeusCode = getBundledPanelSource(request);"
+  );
+
+  out = out.replace(
+    /let latestVersion = "Unknown";\s*try \{\s*const ghRes = await fetch\([\s\S]*?\}\s*catch \(e\) \{\}/m,
+    "let latestVersion = getBundledPanelVersion();"
+  );
+
+  out = out.replace(
+    /const githubRes = await fetch\([^;]+;\s*if \(!githubRes\.ok\) throw new Error\("Failed to fetch source from GitHub"\);\s*const newCode = await githubRes\.text\(\);/m,
+    "const newCode = getBundledPanelSource(request);"
+  );
 
   return out;
-}
-
-
-function replaceOnceOrThrow(input, pattern, replacement, label) {
-  const next = input.replace(pattern, replacement);
-  if (next === input) {
-    throw new Error(`Could not embed panel source in deployer: ${label} pattern not found`);
-  }
-  return next;
-}
-
-function embedPanelSourceIntoDeployer(code, panelCode) {
-  let out = code;
-
-  out = replaceOnceOrThrow(
-    out,
-    /const githubRes = await fetch\("https:\/\/raw\.githubusercontent\.com\/[^"]+\/zeus\.js\?t=" \+ Date\.now\(\)\);\s*if \(!githubRes\.ok\) throw new Error\("خطا در دریافت سورس از گیت‌هاب\."\);\s*const zeusCode = await githubRes\.text\(\);/,
-    "const zeusCode = DLB_PANEL_SOURCE;",
-    "initial deploy source fetch"
-  );
-
-  out = replaceOnceOrThrow(
-    out,
-    /const githubRes = await fetch\("https:\/\/raw\.githubusercontent\.com\/[^"]+\/zeus\.js\?t=" \+ Date\.now\(\)\);\s*if \(!githubRes\.ok\) throw new Error\("Failed to fetch source from GitHub"\);\s*const newCode = await githubRes\.text\(\);/,
-    "const newCode = DLB_PANEL_SOURCE;",
-    "update source fetch"
-  );
-
-  const latestVersionPattern = /let latestVersion = "Unknown"; try \{ const ghRes = await fetch\("https:\/\/raw\.githubusercontent\.com\/[^"]+\/zeus\.js\?t=" \+ Date\.now\(\)\); if \(ghRes\.ok\) \{ const ghText = await ghRes\.text\(\); const match = ghText\.match\(\/CURRENT_VERSION\\s\*\=\\s\*\['"\]\(\[0-9\\\.\]\+\)\['"\]\/i\); if \(match && match\[1\]\) latestVersion = "v" \+ match\[1\]; \} \} catch \(e\) \{\}/;
-  out = out.replace(
-    latestVersionPattern,
-    `let latestVersion = "Unknown"; try { const ghText = DLB_PANEL_SOURCE; const match = ghText.match(/CURRENT_VERSION\\s*=\\s*['"]([0-9\\.]+)['"]/i); if (match && match[1]) latestVersion = "v" + match[1]; } catch (e) {}`
-  );
-
-  return `const DLB_PANEL_SOURCE = ${JSON.stringify(panelCode)};\n${out}`;
 }
 
 function assertNoPanelForbidden(text, filename) {
@@ -186,17 +192,31 @@ function assertNoPanelForbidden(text, filename) {
   }
 }
 
+function assertRawUrls(text, filename) {
+  const wrongRootRawUrls = [
+    `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/zeus.js`,
+    `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/zeus.js`,
+    `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/ips.txt`,
+    `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/ips.txt`
+  ];
+  const found = wrongRootRawUrls.filter((item) => text.includes(item));
+  if (found.length) {
+    throw new Error(`${filename} uses repository-root raw URLs instead of dist URLs: ${found.join(", ")}`);
+  }
+}
+
 assertConfig();
 
 const panelSource = await fetchOrRead("zeus.js", config.upstream.panel);
 const deployerSource = await fetchOrRead("zeus deployer.js", config.upstream.deployer);
 
 const panelOut = patchPanelSpecific(panelSource);
-let deployerOut = patchDeployerSpecific(deployerSource);
-deployerOut = embedPanelSourceIntoDeployer(deployerOut, panelOut);
+const deployerOut = patchDeployerSpecific(deployerSource, panelOut);
 
 assertNoPanelForbidden(panelOut, "zeus.js");
 assertNoPanelForbidden(deployerOut, "dlb-deployer.js");
+assertRawUrls(panelOut, "zeus.js");
+assertRawUrls(deployerOut, "dlb-deployer.js");
 
 await writeFile(path.join(OUT_DIR, "zeus.js"), panelOut, "utf8");
 await writeFile(path.join(OUT_DIR, "dlb-deployer.js"), deployerOut, "utf8");
@@ -213,6 +233,7 @@ await copyFile(path.join(root, "wrangler.toml.example"), path.join(OUT_DIR, "wra
 console.log("DLB Panel build completed:");
 console.log("- dist/zeus.js");
 console.log("- dist/dlb-deployer.js");
+console.log("- dist/ips.txt");
 console.log("- dist/wrangler.toml.example");
 console.log(`Brand: ${config.brandName}`);
 console.log(`Telegram in generated config remarks: @${config.telegramUsername}`);

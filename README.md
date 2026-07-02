@@ -154,3 +154,15 @@ dlb-panel.config.json
 ```txt
 docs/CLOUDFLARE_DEPLOY.md
 ```
+
+## نکته مهم نسخه اصلاح‌شده
+
+در این نسخه خطای Cloudflare با متن «خطا در دریافت سورس از گیت‌هاب» رفع شده است. Deployer برای ساخت پنل دیگر به دریافت لحظه‌ای `zeus.js` از GitHub وابسته نیست و سورس خروجی پنل داخل `dist/dlb-deployer.js` bundle شده است. با این حال فایل‌های `dist/zeus.js` و `dist/ips.txt` هم داخل پروژه باقی مانده‌اند تا آپدیت داخلی پنل و لیست IPها مسیر درست داشته باشند.
+
+برای Git Deploy در Cloudflare این مقادیر را بگذار:
+
+```txt
+Build command: npm run build
+Deploy command: npm run deploy
+Root directory: /
+```
