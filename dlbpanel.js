@@ -38,11 +38,40 @@ export default {
 		if (url.pathname.startsWith("/status/")) {
 			return await Router.handleUserStatus(url, env);
 		}
-		return new Response(HTML_TEMPLATES.nginx, {
-			headers: { "Content-Type": "text/html; charset=utf-8" },
+		if (url.pathname === "/") {
+			return Response.redirect(url.origin + "/panel", 302);
+		}
+		return new Response("Not Found", {
+			status: 404,
+			headers: { "Content-Type": "text/plain; charset=utf-8" },
 		});
 	},
 };
+
+function sanitizeDlbPanelIps(rawText) {
+	const lines = String(rawText || "")
+		.replace(/\r/g, "")
+		.split("\n")
+		.map((line) => line.trim());
+	const cleaned = [];
+	const isValidIpOrHost = (line) => {
+		if (!line || /[<>{}]/.test(line) || /\s/.test(line)) return false;
+		const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
+		const ipv6 = /^[0-9a-fA-F:]{3,}$/.test(line) && line.includes(":");
+		const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(line) && line.includes(".");
+		return ipv4 || ipv6 || host;
+	};
+	for (const line of lines) {
+		if (!line) continue;
+		if (line.startsWith("#") || line.startsWith("----------")) {
+			cleaned.push(line);
+			continue;
+		}
+		if (line.startsWith("[source")) continue;
+		if (isValidIpOrHost(line)) cleaned.push(line);
+	}
+	return cleaned.join("\n");
+}
 const Router = {
 	isWebSocketUpgrade(request) {
 		const upgradeHeader = (request.headers.get("Upgrade") || "").toLowerCase();
@@ -266,6 +295,35 @@ const Router = {
 				status: 401,
 				headers: { "Content-Type": "application/json; charset=utf-8" },
 			});
+		}
+		if (url.pathname === "/api/clean-ips" && request.method === "GET") {
+			try {
+				const ipsResponse = await fetch("https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt?t=" + Date.now(), {
+					headers: {
+						"Accept": "text/plain,*/*",
+						"Cache-Control": "no-cache, no-store, must-revalidate",
+						"Pragma": "no-cache",
+						"Expires": "0",
+					},
+				});
+				if (!ipsResponse.ok) throw new Error("Failed to fetch IP list");
+				const rawText = await ipsResponse.text();
+				const cleanText = sanitizeDlbPanelIps(rawText);
+				const ipLikeCount = cleanText.split("\n").filter((line) => line && !line.startsWith("#") && !line.startsWith("----------")).length;
+				if (ipLikeCount === 0) throw new Error("Fetched file did not contain valid IP/host entries");
+				return new Response(cleanText, {
+					headers: {
+						"Content-Type": "text/plain; charset=utf-8",
+						"Cache-Control": "no-store, no-cache, must-revalidate, max-age=0",
+						"X-Content-Type-Options": "nosniff",
+					},
+				});
+			} catch (err) {
+				return new Response(JSON.stringify({ error: err.message || "Failed to load clean IP list" }), {
+					status: 502,
+					headers: { "Content-Type": "application/json; charset=utf-8" },
+				});
+			}
 		}
 		if (url.pathname === "/api/update-panel" && request.method === "POST") {
 			const body = await request.json().catch(() => ({}));
@@ -729,10 +787,8 @@ const SubscriptionService = {
 			.filter((p) => p.length > 0);
 		const fp = user.fingerprint || "chrome";
 		const links = [];
-		const m1 = decodeURIComponent("%E2%9A%A0%EF%B8%8F%D9%BE%D9%86%D9%84%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%D9%88%20%D8%BA%DB%8C%D8%B1%20%D9%82%D8%A7%D8%A8%D9%84%20%D9%81%D8%B1%D9%88%D8%B4%E2%9A%A0%EF%B8%8F");
-		const m2 = "🚀 DLB Panel ساخت رایگان 🚀";
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#" + encodeURIComponent(m1));
-		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#" + encodeURIComponent(m2));
+		const brandRemark = "خرید با کمترین قیمت از @Ali_dlb404 در تلگرام";
+		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=%2Fdlbpanel#" + encodeURIComponent(brandRemark));
 		let remVol = "Unlimited";
 		if (user.limit_gb) {
 			let rem = user.limit_gb - (user.used_gb || 0);
@@ -752,11 +808,11 @@ const SubscriptionService = {
 		}
 		const infoRemark = "📊 remaining | \u200E" + remVol + " | \u200E" + remTime + " | \u200E" + remReq;
 		links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + host + ":80?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=none&encryption=none&host=" + host + "&fp=" + fp + "&type=ws#" + encodeURIComponent(infoRemark));
-		ips.forEach((ip) => {
+		ips.forEach((ip, ipIndex) => {
 			ports.forEach((portStr) => {
 				const isTlsPort = ["443", "2053", "2083", "2087", "2096", "8443"].includes(portStr);
 				const tlsVal = isTlsPort ? "tls" : "none";
-				const remark = user.username + " | " + ip + " | " + portStr;
+				const remark = user.username + " | کانفیگ " + (ipIndex + 1) + " | " + portStr;
 				links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@" + ip + ":" + portStr + "?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=" + tlsVal + "&encryption=none&insecure=0&host=" + host + "&fp=" + fp + "&type=ws&allowInsecure=0&sni=" + host + "#" + encodeURIComponent(remark));
 			});
 		});
@@ -2510,7 +2566,7 @@ login: `<!DOCTYPE html>
         </div>
         <h3 class="font-black text-xl text-gray-900 dark:text-white mb-2">پیام همگانی</h3>
         <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
-            این پنل کاملاً <span class="text-rose-500 font-bold">رایگان</span> است. هرگونه فروش پنل یا کانفیگ‌های آن مصداق بی ناموسی و بی شرفی است. لطفاً از این ابزار فقط به صورت شخصی و رایگان استفاده کنید.
+            خرید با کمترین قیمت از <span class="text-rose-500 font-bold" dir="ltr">@Ali_dlb404</span> در تلگرام
         </p>
         <button onclick="closeFreePanelWarning()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-rose-500/25">
             تأیید و موافقت
@@ -3821,15 +3877,13 @@ function closeFreePanelWarning() {
             const ports = String(user.port || '443').split(',').map(p => p.trim()).filter(p => p.length > 0);
             const fp = user.fingerprint || 'chrome';
             const links = [];
-            const m1 = decodeURIComponent('%E2%9A%A0%EF%B8%8F%D8%A7%DB%8C%D9%86%20%D9%BE%D9%86%D9%84%20%D8%B1%D8%A7%DB%8C%DA%AF%D8%A7%D9%86%20%D9%88%20%D8%BA%DB%8C%D8%B1%20%D9%82%D8%A7%D8%A8%D9%84%20%D9%81%D8%B1%D9%88%D8%B4%20%D8%A7%D8%B3%D8%AA%E2%9A%A0%EF%B8%8F');
-            const m2 = '♨️ DLB Panel ساخت رایگان ♨️';
-            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#' + encodeURIComponent(m1));
-            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh#' + encodeURIComponent(m2));
-            ips.forEach((ip) => {
+            const brandRemark = 'خرید با کمترین قیمت از @Ali_dlb404 در تلگرام';
+            links.push('vle' + 'ss://' + (user.uuid || '') + '@0.0.0.0:1?encryption=none&security=none&type=ws&host=' + host + '&path=%2Fdlbpanel#' + encodeURIComponent(brandRemark));
+            ips.forEach((ip, ipIndex) => {
                 ports.forEach((portStr) => {
                     const isTlsPort = tlsPorts.includes(portStr);
                     const tlsVal = isTlsPort ? 'tls' : 'none';
-                    const remark = user.username + ' | ' + ip + ' | ' + portStr;
+                    const remark = user.username + ' | کانفیگ ' + (ipIndex + 1) + ' | ' + portStr;
                     links.push('vle' + 'ss://' + (user.uuid || '') + '@' + ip + ':' + portStr + '?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + '#' + encodeURIComponent(remark));
                 });
             });
@@ -4314,32 +4368,42 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
             }
         }
 let cachedIpsData = {};
+function isDlbPanelValidIpLine(line) {
+    if (!line) return false;
+    if (/[<>{}]/.test(line)) return false;
+    if (/\s/.test(line)) return false;
+    const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
+    const ipv6 = /^[0-9a-fA-F:]{3,}$/.test(line) && line.includes(':');
+    const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))*\.?$/.test(line) && line.includes('.');
+    return ipv4 || ipv6 || host;
+}
 async function fetchIpsList() {
     try {
-        const response = await fetch('https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt');
+        const response = await fetch('/api/clean-ips', { cache: 'no-store' });
         if (!response.ok) throw new Error('Fetch failed');
         const text = await response.text();
         const blocks = text.split('----------');
         cachedIpsData = {};
         blocks.forEach(block => {
-            const lines = block.trim().split('\\n').map(l => l.trim()).filter(l => l.length > 0);
+            const lines = block.trim().split('\n').map(l => l.trim()).filter(l => l.length > 0);
             if (lines.length === 0) return;
             let opName = "Unknown";
             const ips = [];
             lines.forEach(line => {
-                if (line.includes('#')) {
-                    opName = line.split('#')[1].trim();
-                } else if (!line.startsWith('[source')) {
+                if (line.startsWith('#')) {
+                    opName = line.replace(/^#+/, '').trim() || opName;
+                } else if (!line.startsWith('[source') && isDlbPanelValidIpLine(line)) {
                     ips.push(line);
                 }
             });
             if (ips.length > 0) {
-                cachedIpsData[opName] = ips;
+                cachedIpsData[opName] = [...new Set(ips)];
             }
         });
+        if (Object.keys(cachedIpsData).length === 0) throw new Error('Empty list');
         populateIpSelect();
     } catch (err) {
-        alert('Failed to load IP list from GitHub.');
+        alert('لیست IP معتبر دریافت نشد. لطفاً بعد از آپدیت Worker دوباره تلاش کنید.');
         toggleIpSelectorModal(false);
     }
 }
@@ -4601,7 +4665,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <svg class="w-5 h-5 text-amber-500 dark:text-amber-400 group-hover:scale-110 transition" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z"/>
             </svg>
-            ساخت رایگان پنل
+            DLB Panel
         </a>
 
         <a href="https://github.com/Alidl81/DLB-Panel" target="_blank" class="flex items-center gap-2 px-4 py-2 bg-white dark:bg-amoled-card border border-gray-200 dark:border-amoled-border rounded-full shadow-sm hover:shadow-md transition text-sm font-bold text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 group">
@@ -4632,7 +4696,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 ports.forEach(function(portStr) {
                     var isTlsPort = ['443', '2053', '2083', '2087', '2096', '8443'].includes(portStr);
                     var tlsVal = isTlsPort ? 'tls' : 'none';
-                    var remark = ips.length > 1 ? (u.username + '-' + (ipIndex + 1) + '-' + portStr) : (u.username + '-' + portStr);
+                    var remark = u.username + ' | کانفیگ ' + (ipIndex + 1) + ' | ' + portStr;
                     links.push('vle' + 'ss://' + (u.uuid || '') + '@' + ip + ':' + portStr + '?path=%2FIn_Panel_Rayeghan_Ast_Va_Gheyre_Ghabele_Foroosh&security=' + tlsVal + '&encryption=none&insecure=0&host=' + host + '&fp=' + fp + '&type=ws&allowInsecure=0&sni=' + host + '#' + encodeURIComponent(remark));
                 });
             });

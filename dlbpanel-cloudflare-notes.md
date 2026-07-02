@@ -17,3 +17,9 @@ If Cloudflare already handles install automatically, the deploy command can be:
 ```bash
 npm run deploy
 ```
+
+
+## Fix notes
+
+- Root path `/` now redirects to `/panel` so opening the Worker base URL does not expose the landing-page HTML.
+- Clean IP loading now goes through `/api/clean-ips`, which fetches and sanitizes `IR-NETLIFY/zeus/ips.txt` server-side before the panel fills IP fields.
