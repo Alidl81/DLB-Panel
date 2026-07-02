@@ -1,4 +1,4 @@
-name = "dlb-panel"
+name = "dlbpanel"
 main = "dlbpanel.js"
 compatibility_date = "2024-02-08"
 workers_dev = true
