@@ -1,4 +1,15 @@
 import { connect } from "cloudflare:sockets";
+const DLB_BUNDLED_IPS_TEXT = "# همراه اول\nwww.speedtest.net\n104.20.44.53\n104.20.44.170\n172.67.165.8\n104.18.32.35\n104.19.127.93\n172.65.145.115\n172.65.190.103\n172.67.177.134\n104.19.253.144\n104.21.44.121\n172.66.44.189\n104.25.206.98\n104.20.7.154\n104.20.39.21\n108.162.193.95\n172.67.123.252\n104.19.30.121\n172.66.176.233\n104.19.9.203\n104.27.204.123\n104.19.22.251\n172.65.108.158\n104.19.107.2\n104.16.177.19\n172.67.142.53\n172.66.170.137\n104.16.103.153\n172.65.166.81\n104.25.131.97\n104.16.85.118\n172.67.190.227\n104.19.42.130\n104.17.130.182\n104.19.228.247\n104.27.108.214\n172.64.76.137\n104.19.108.38\n104.24.44.23\n104.16.21.147\n104.17.231.226\n104.21.7.233\n104.25.93.249\n172.66.217.237\n104.19.77.44\n104.19.185.8\n104.16.142.161\n172.67.128.147\n108.162.196.200\n108.162.193.38\n108.162.193.111\n104.27.8.254\n172.67.147.237\n104.24.87.3\n104.24.215.239\n108.162.192.252\n172.65.61.61\n108.162.192.182\n104.16.225.21\n172.64.68.185\n104.19.132.178\n104.24.198.236\n172.67.188.112\n104.24.203.130\n172.64.88.53\n108.162.196.40\n104.17.203.240\n108.162.192.206\n104.21.12.23\n104.19.48.188\n104.18.34.232\n104.19.74.136\n104.17.133.25\n104.17.65.196\n104.16.17.254\n104.16.117.236\n104.18.68.3\n104.17.63.200\n172.67.203.95\n104.24.78.223\n104.18.174.242\n104.16.205.204\n104.16.153.152\n104.21.200.123\n104.16.109.73\n104.20.15.82\n108.162.193.77\n172.65.243.12\n104.19.7.158\n104.27.24.1\n104.17.231.139\n172.67.85.213\n172.65.121.98\n172.67.226.65\n172.67.77.246\n172.66.161.73\n172.65.119.199\n108.162.194.237\n104.19.52.241\n104.19.186.216\n104.21.194.41\n172.67.91.87\n104.24.27.9\n172.66.145.154\n108.162.193.0\n172.65.180.194\n172.65.176.48\n104.16.67.52\n172.67.173.109\n104.25.125.241\n104.19.93.221\n108.162.196.215\n104.18.35.76\n104.21.78.216\n104.17.68.185\n104.25.244.30\n172.64.80.85\n172.66.204.75\n104.20.44.170\n104.24.78.181\n172.67.211.167\n104.18.203.92\n104.17.35.109\n104.16.117.74\n104.27.77.155\n108.162.192.67\n172.64.75.68\n172.65.121.243\n104.18.248.67\n104.21.217.255\n172.65.118.5\n104.19.66.72\n172.64.157.244\n104.27.16.154\n108.162.193.176\n104.21.195.90\n172.66.212.215\n172.65.202.130\n104.19.238.233\n104.19.250.128\n104.18.249.94\n108.162.198.203\n172.65.174.3\n----------\n# ایرانسل\nwww.speedtest.net\n104.17.128.87\n103.160.204.34\n104.24.211.86\n104.21.112.26\n162.159.255.15\n104.16.167.65\n172.67.188.188\n104.16.126.179\n104.19.9.3\n104.25.156.44\n104.21.51.16\n104.24.234.30\n104.21.23.79\n172.66.142.92\n104.17.178.196\n172.67.113.56\n104.18.3.97\n104.18.15.211\n104.17.223.228\n172.67.82.117\n104.19.184.2\n104.21.230.183\n104.17.137.90\n104.21.209.200\n104.16.45.222\n104.21.92.225\n104.27.72.231\n104.24.184.203\n104.24.38.86\n104.21.3.125\n104.16.12.213\n104.25.134.200\n104.20.11.160\n104.16.29.59\n104.16.144.192\n198.41.203.182\n172.67.133.37\n104.17.122.212\n104.19.87.119\n104.16.111.154\n104.21.111.204\n104.17.135.110\n104.21.3.21\n104.24.22.168\n141.101.114.7\n104.25.107.158\n172.64.155.24\n172.67.223.97\n104.18.72.78\n104.25.204.143\n104.24.249.73\n172.67.105.91\n185.193.30.94\n199.181.197.1\n104.17.131.141\n104.17.130.174\n104.17.129.158\n104.17.170.119\n104.17.124.173\n104.17.127.75\n104.17.126.186\n104.17.125.27\n104.17.123.99\n190.93.246.54\n172.67.254.250\n190.93.247.176\n172.67.251.233\n198.41.215.140\n198.41.216.87\n198.41.214.192\n104.16.48.21\n104.16.167.201\n----------\n# رایتل/سامانتل\n45.130.125.78\n104.20.44.170\n104.17.128.87\n167.71.45.93\n18.193.131.26\n18.192.93.64\n138.197.183.219\n18.184.55.249\n145.223.100.111\n18.184.27.249\n18.196.70.197\n18.197.218.69\n18.159.105.97\n178.250.187.110\n150.241.123.57\n109.122.198.64\n166.1.36.83\n109.122.198.127\n138.201.170.108\n116.202.132.205\n103.137.248.227\n94.159.111.170\n104.16.174.219\n104.16.174.254\n104.16.174.226\n104.16.174.252\n104.17.72.206\n104.17.100.130\n188.114.97.6\n188.114.98.219\n104.20.44.170\n104.17.98.110\n----------\n# شاتل\n104.18.32.47\n104.19.1.1\n104.18.32.1\n162.159.0.1\n104.18.63.223\n104.18.94.58\n104.18.94.92\n104.18.94.47\n104.18.94.65\n104.17.48.20\n104.18.94.146\n104.18.94.137\n104.18.94.125\n104.18.94.138\n104.18.94.25\n104.18.28.234\n104.20.44.170\n188.114.96.6\n----------\n# ADSL\n104.16.72.105\n104.16.72.139\n104.16.72.162\n104.16.72.251\n104.16.75.62\n104.17.107.119\n104.17.121.228\n104.17.122.42\n104.18.153.188\n104.18.154.96\n45.130.125.4\n45.130.125.10\n45.130.125.21\n45.130.125.72\n45.130.125.74\n45.130.125.105\n45.130.125.113\n45.130.125.142\n45.130.125.143\n45.130.125.150\n45.130.125.201\n45.130.125.208\n45.130.125.213\n45.130.125.215\n45.130.125.221\n45.130.125.242\n104.17.121.10\n104.17.121.12\n104.17.121.19\n104.17.121.31\n104.17.121.70\n104.17.121.97\n104.17.121.206\n104.17.121.208\n104.17.121.231\n199.181.197.53\n199.181.197.56\n199.181.197.67\n199.181.197.71\n199.181.197.73\n199.181.197.77\n199.181.197.90\n199.181.197.92\n199.181.197.101\n199.181.197.103\n199.181.197.108\n199.181.197.109\n199.181.197.111\n199.181.197.119\n199.181.197.120\n199.181.197.122\n199.181.197.123\n199.181.197.126\n199.181.197.127\n199.181.197.131\n199.181.197.132\n199.181.197.133\n199.181.197.135\n199.181.197.140\n199.181.197.145\n199.181.197.146\n199.181.197.147\n199.181.197.149\n199.181.197.151\n199.181.197.152\n199.181.197.153\n199.181.197.155\n199.181.197.158\n199.181.197.172\n199.181.197.174\n199.181.197.179\n199.181.197.188\n199.181.197.189\n199.181.197.195\n199.181.197.203\n199.181.197.205\n199.181.197.211\n199.181.197.215\n199.181.197.218\n199.181.197.225\n199.181.197.229\n199.181.197.231\n199.181.197.233\n199.181.197.234\n199.181.197.239\n199.181.197.243\n199.181.197.246\n199.181.197.247\n199.181.197.248\n199.181.197.250\n199.181.197.252\n199.181.197.253\n199.181.197.254\n199.181.197.255\n";
+async function fetchCurrentWorkerSourceFromCloudflare(accountId, token, scriptName) {
+	const res = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/workers/scripts/${scriptName}/content`, {
+		headers: { Authorization: "Bearer " + token },
+	});
+	if (!res.ok) {
+		throw new Error("خطا در دریافت سورس فعلی از Cloudflare");
+	}
+	return await res.text();
+}
+
 const GLOBAL_TRAFFIC_CACHE = new Map();
 const ACTIVE_CONNECTIONS_COUNT = new Map();
 const GLOBAL_LAST_ACTIVE_WRITE = new Map();
@@ -23,6 +34,9 @@ export default {
 		trackRequest(env, ctx);
 		await DbService.ensureSchema(env.DB);
 		const url = new URL(request.url);
+		if (url.pathname === "/dlb/ips.txt" || url.pathname === "/ips.txt") {
+			return new Response(DLB_BUNDLED_IPS_TEXT, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" } });
+		}
 		if (Router.isWebSocketUpgrade(request) && url.pathname === "/DLB_Panel_Ali_dlb404") {
 			return await Router.handleWebSocket(request, env, ctx);
 		}
@@ -285,18 +299,8 @@ const Router = {
 					if (!accData.success || accData.result.length === 0) throw new Error("توکن نامعتبر است یا اکانتی یافت نشد.");
 					currentAccountId = accData.result[0].id;
 				}
-
-				const githubRes = await fetch("https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dist/zeus.js?t=" + Date.now() + Math.random(), {
-					headers: {
-						"Cache-Control": "no-cache, no-store, must-revalidate",
-						Pragma: "no-cache",
-						Expires: "0",
-					},
-				});
-				if (!githubRes.ok) throw new Error("خطا در دریافت سورس جدید از گیت‌هاب");
-				const newCode = await githubRes.text();
-
 				const scriptName = env.WORKER_NAME || url.hostname.split(".")[0];
+				const newCode = await fetchCurrentWorkerSourceFromCloudflare(currentAccountId, currentToken, scriptName);
 				const bindingsRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${currentAccountId}/workers/scripts/${scriptName}/bindings`, {
 					headers: { Authorization: "Bearer " + currentToken },
 				});
@@ -354,17 +358,8 @@ const Router = {
 			}
 
 			try {
-				const githubRes = await fetch("https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dist/zeus.js?t=" + Date.now(), {
-					headers: {
-						"Cache-Control": "no-cache, no-store, must-revalidate",
-						Pragma: "no-cache",
-						Expires: "0",
-					},
-				});
-				if (!githubRes.ok) throw new Error("خطا در دریافت سورس از گیت‌هاب");
-				const newCode = await githubRes.text();
-
 				const scriptName = env.WORKER_NAME || url.hostname.split(".")[0];
+				const newCode = await fetchCurrentWorkerSourceFromCloudflare(currentAccountId, currentToken, scriptName);
 				const bindingsRes = await fetch(`https://api.cloudflare.com/client/v4/accounts/${currentAccountId}/workers/scripts/${scriptName}/bindings`, {
 					headers: { Authorization: "Bearer " + currentToken },
 				});
@@ -4224,11 +4219,7 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
                 if (isManual) {
                     document.getElementById('update-toggle').classList.add('animate-pulse');
                 }
-                const res = await fetch('https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dist/zeus.js?t=' + Date.now());
-                if (!res.ok) throw new Error('Network response was not ok');
-                const text = await res.text();
-                const match = text.match(/const\\s+CURRENT_VERSION\\s*=\\s*['"](\\d+\\.\\d+\\.\\d+)['"]/i);
-                const latestVersion = match ? match[1] : null;
+                const latestVersion = CURRENT_VERSION;
                 if (isManual) {
                     document.getElementById('update-toggle').classList.remove('animate-pulse');
                 }
@@ -4248,7 +4239,7 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
             } catch (err) {
                 if (isManual) {
                     document.getElementById('update-toggle').classList.remove('animate-pulse');
-                    alert('خطا در بررسی آپدیت از گیت هاب.');
+                    alert('بررسی آپدیت خارجی در این نسخه غیرفعال است.');
                 }
             }
         }
@@ -4314,7 +4305,7 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 let cachedIpsData = {};
 async function fetchIpsList() {
     try {
-        const response = await fetch('https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dist/ips.txt');
+        const response = await fetch('/dlb/ips.txt');
         if (!response.ok) throw new Error('Fetch failed');
         const text = await response.text();
         const blocks = text.split('----------');

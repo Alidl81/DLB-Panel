@@ -20,6 +20,10 @@ const forbidden = [
 ];
 
 const wrongRootRawUrls = [
+  "raw.githubusercontent.com",
+  "خطا در دریافت سورس از گیت‌هاب",
+  "خطا در دریافت سورس جدید از گیت‌هاب",
+  "Failed to fetch source from GitHub",
   `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/zeus.js`,
   `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/zeus.js`,
   `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/ips.txt`,
@@ -34,7 +38,7 @@ for (const file of files) {
   if (foundForbidden.length || foundWrongUrls.length) {
     failed = true;
     if (foundForbidden.length) console.error(`${path.basename(file)} contains forbidden terms: ${foundForbidden.join(", ")}`);
-    if (foundWrongUrls.length) console.error(`${path.basename(file)} contains wrong root raw URLs: ${foundWrongUrls.join(", ")}`);
+    if (foundWrongUrls.length) console.error(`${path.basename(file)} contains GitHub-runtime dependency or GitHub source error text: ${foundWrongUrls.join(", ")}`);
   } else {
     console.log(`${path.basename(file)}: OK`);
   }

@@ -1,33 +1,34 @@
-# اصلاحات اعمال‌شده برای رفع خطای Cloudflare
+# Fixes applied
 
-این نسخه برای رفع خطای «خطا در دریافت سورس از گیت‌هاب» و پایدارتر شدن Git Deploy آماده شده است.
+This package fixes the Cloudflare deployer error:
 
-## علت اصلی خطا
+`خطا در دریافت سورس از گیت‌هاب`
 
-در نسخه قبلی، اسکریپت build ابتدا عبارت عمومی `IR-NETLIFY/zeus` را جایگزین می‌کرد و بعد می‌خواست لینک کامل raw را به مسیر درست `dist/zeus.js` تبدیل کند. به همین دلیل خروجی نهایی به‌جای این مسیر:
+## What changed
 
-```txt
-https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/dist/zeus.js
+- The deployer no longer fetches `zeus.js` from GitHub when creating a panel.
+- The generated panel source is bundled inside `dist/dlb-deployer.js`.
+- The deployer update route uses the bundled panel source too.
+- The panel no longer contains runtime `raw.githubusercontent.com` calls.
+- `ips.txt` is served locally from `/dlb/ips.txt` and `/ips.txt`.
+- The build verifier fails if any generated output still contains:
+  - `raw.githubusercontent.com`
+  - `خطا در دریافت سورس از گیت‌هاب`
+  - `خطا در دریافت سورس جدید از گیت‌هاب`
+  - `Failed to fetch source from GitHub`
+- `npm run deploy` now runs the build before `wrangler deploy`.
+
+## Verified commands
+
+```bash
+npm run prepare:github
+node --check dist/zeus.js
+node --check dist/dlb-deployer.js
 ```
 
-به اشتباه این مسیر را صدا می‌زد:
+## Cloudflare settings
 
-```txt
-https://raw.githubusercontent.com/Alidl81/DLB-Panel/refs/heads/main/zeus.js
-```
-
-چون فایل `zeus.js` در ریشه ریپو وجود نداشت، Deployer روی Cloudflare خطای دریافت سورس از گیت‌هاب می‌داد.
-
-## اصلاحات مهم
-
-- لینک‌های raw مربوط به `zeus.js` و `ips.txt` به مسیر درست داخل `dist/` منتقل شدند.
-- فایل `dist/dlb-deployer.js` دیگر برای ساخت پنل به GitHub وابسته نیست؛ سورس آماده‌شده پنل داخل خود Deployer bundle شده است.
-- فایل‌های `upstream/zeus.js`، `upstream/zeus deployer.js` و `upstream/ips.txt` داخل پروژه قرار داده شدند تا build در Cloudflare به دریافت upstream وابسته نباشد.
-- اسکریپت `deploy` به شکل امن‌تر تنظیم شد و قبل از deploy دوباره build می‌گیرد.
-- verify جدید علاوه بر عبارت‌های ممنوع، لینک raw اشتباه به ریشه ریپو را هم تشخیص می‌دهد.
-- خروجی‌های `dist/zeus.js`، `dist/dlb-deployer.js` و `dist/ips.txt` از قبل ساخته شده‌اند.
-
-## تنظیمات پیشنهادی Cloudflare Git Deploy
+Use these settings for Git-based deployment:
 
 ```txt
 Build command: npm run build
@@ -35,4 +36,4 @@ Deploy command: npm run deploy
 Root directory: /
 ```
 
-اگر Cloudflare فقط Deploy command را اجرا کند هم مشکلی نیست، چون `npm run deploy` خودش build را هم اجرا می‌کند.
+If an older deployer is already live, delete/redeploy that Worker or redeploy with cleared build cache. The old Worker can still show the GitHub error even after the repository is fixed.

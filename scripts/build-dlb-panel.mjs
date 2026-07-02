@@ -113,9 +113,46 @@ function basicBranding(code) {
   return out;
 }
 
-function patchPanelSpecific(code) {
+function patchPanelSpecific(code, ipsText = "") {
   let out = basicBranding(code);
   const purchaseRemark = JSON.stringify(config.purchaseConfigRemark || `برای خرید به تلگرام @${config.telegramUsername} مراجعه کنید`);
+
+  const panelRuntimeHelper = `const DLB_BUNDLED_IPS_TEXT = ${JSON.stringify(ipsText || "")};
+async function fetchCurrentWorkerSourceFromCloudflare(accountId, token, scriptName) {
+	const res = await fetch(\`https://api.cloudflare.com/client/v4/accounts/\${accountId}/workers/scripts/\${scriptName}/content\`, {
+		headers: { Authorization: "Bearer " + token },
+	});
+	if (!res.ok) {
+		throw new Error("خطا در دریافت سورس فعلی از Cloudflare");
+	}
+	return await res.text();
+}
+`;
+  out = out.replace(
+    'import { connect } from "cloudflare:sockets";',
+    'import { connect } from "cloudflare:sockets";\n' + panelRuntimeHelper
+  );
+
+  out = out.replace(
+    'const url = new URL(request.url);\r\n\t\tif (Router.isWebSocketUpgrade(request)',
+    'const url = new URL(request.url);\r\n\t\tif (url.pathname === "/dlb/ips.txt" || url.pathname === "/ips.txt") {\r\n\t\t\treturn new Response(DLB_BUNDLED_IPS_TEXT, { headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "public, max-age=3600" } });\r\n\t\t}\r\n\t\tif (Router.isWebSocketUpgrade(request)'
+  );
+
+  // Remove runtime GitHub dependency from the generated panel. Update/restart
+  // now redeploy the currently running worker source from Cloudflare itself.
+  out = out.replace(
+    /\s*const githubRes = await fetch\([\s\S]*?githubRes\.text\(\);\s*\r?\n\s*const scriptName = env\.WORKER_NAME \|\| url\.hostname\.split\("\."\)\[0\];/gm,
+    '\n\t\t\t\tconst scriptName = env.WORKER_NAME || url.hostname.split(".")[0];\n\t\t\t\tconst newCode = await fetchCurrentWorkerSourceFromCloudflare(currentAccountId, currentToken, scriptName);'
+  );
+
+  out = out.replace(
+    /const res = await fetch\('https:\/\/raw\.githubusercontent\.com\/[\s\S]*?const latestVersion = match \? match\[1\] : null;/m,
+    'const latestVersion = CURRENT_VERSION;'
+  );
+  out = out.replace(/https:\/\/raw\.githubusercontent\.com\/[^'\"]+\/ips\.txt/g, '/dlb/ips.txt');
+  out = out.replace(/خطا در بررسی آپدیت از گیت هاب/g, 'بررسی آپدیت خارجی در این نسخه غیرفعال است');
+  out = out.replace(/خطا در دریافت سورس جدید از گیت‌هاب/g, 'خطا در دریافت سورس فعلی از Cloudflare');
+  out = out.replace(/خطا در دریافت سورس از گیت‌هاب/g, 'خطا در دریافت سورس فعلی از Cloudflare');
 
   // The original subscription service inserts two promotional configs before user configs.
   // Replace them with one clean owner config containing the requested Telegram ID.
@@ -193,15 +230,19 @@ function assertNoPanelForbidden(text, filename) {
 }
 
 function assertRawUrls(text, filename) {
-  const wrongRootRawUrls = [
+  const wrongRuntimeItems = [
+    "raw.githubusercontent.com",
+    "خطا در دریافت سورس از گیت‌هاب",
+    "خطا در دریافت سورس جدید از گیت‌هاب",
+    "Failed to fetch source from GitHub",
     `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/zeus.js`,
     `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/zeus.js`,
     `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/refs/heads/main/ips.txt`,
     `raw.githubusercontent.com/${config.githubOwner}/${config.githubRepo}/main/ips.txt`
   ];
-  const found = wrongRootRawUrls.filter((item) => text.includes(item));
+  const found = wrongRuntimeItems.filter((item) => text.includes(item));
   if (found.length) {
-    throw new Error(`${filename} uses repository-root raw URLs instead of dist URLs: ${found.join(", ")}`);
+    throw new Error(`${filename} still has GitHub-runtime dependency or GitHub source error text: ${found.join(", ")}`);
   }
 }
 
@@ -209,8 +250,14 @@ assertConfig();
 
 const panelSource = await fetchOrRead("zeus.js", config.upstream.panel);
 const deployerSource = await fetchOrRead("zeus deployer.js", config.upstream.deployer);
+let ips = "";
+try {
+  ips = await fetchOrRead("ips.txt", config.upstream.ips);
+} catch (e) {
+  console.warn("ips.txt was not fetched. You can add it later if needed.");
+}
 
-const panelOut = patchPanelSpecific(panelSource);
+const panelOut = patchPanelSpecific(panelSource, ips);
 const deployerOut = patchDeployerSpecific(deployerSource, panelOut);
 
 assertNoPanelForbidden(panelOut, "zeus.js");
@@ -220,12 +267,8 @@ assertRawUrls(deployerOut, "dlb-deployer.js");
 
 await writeFile(path.join(OUT_DIR, "zeus.js"), panelOut, "utf8");
 await writeFile(path.join(OUT_DIR, "dlb-deployer.js"), deployerOut, "utf8");
-
-try {
-  const ips = await fetchOrRead("ips.txt", config.upstream.ips);
+if (ips) {
   await writeFile(path.join(OUT_DIR, "ips.txt"), ips, "utf8");
-} catch (e) {
-  console.warn("ips.txt was not fetched. You can add it later if needed.");
 }
 
 await copyFile(path.join(root, "wrangler.toml.example"), path.join(OUT_DIR, "wrangler.toml.example"));
