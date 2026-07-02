@@ -4444,6 +4444,10 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
             }
         }
 let cachedIpsData = {};
+const DLBPANEL_IPS_GITHUB_BLOB_URL = 'https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt';
+const DLBPANEL_IPS_GITHUB_RAW_URL = DLBPANEL_IPS_GITHUB_BLOB_URL
+    .replace('https://github.com/', 'https://raw.githubusercontent.com/')
+    .replace('/blob/', '/');
 function isDlbPanelValidIpLine(line) {
     line = String(line || '').trim();
     if (!line || line.length > 253) return false;
@@ -4459,14 +4463,20 @@ function isDlbPanelValidIpLine(line) {
 }
 async function fetchIpsList() {
     try {
-        const response = await fetch('/api/clean-ips?t=' + Date.now(), { cache: 'no-store' });
+        // فقط از فایل ips.txt همان ریپوی خواسته‌شده می‌خوانیم.
+        // لینک blob صفحه HTML گیت‌هاب است؛ برای دریافت متن خام باید معادل raw همان فایل خوانده شود.
+        const response = await fetch(DLBPANEL_IPS_GITHUB_RAW_URL + '?t=' + Date.now(), {
+            cache: 'no-store',
+            redirect: 'follow',
+            headers: { 'Accept': 'text/plain,*/*;q=0.1' }
+        });
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
-        if (!response.ok) throw new Error('Fetch failed');
+        if (!response.ok) throw new Error('GitHub fetch failed');
         if (/text\/html/i.test(contentType) || /<(?:!doctype|html|head|body|script|style|link|meta|div|p|button)\b/i.test(text) || /(?:برای ورود به پنل|ورود به پنل|fontFamily|tailwind|extend\s*:|theme\s*:|Vazirmatn)/i.test(text)) {
-            throw new Error('HTML received instead of ips.txt');
+            throw new Error('GitHub returned HTML instead of ips.txt');
         }
-        const blocks = text.split('----------');
+        const blocks = text.replace(/\r/g, '').split('----------');
         cachedIpsData = {};
         blocks.forEach(block => {
             const lines = block.trim().split('\n').map(l => l.trim()).filter(l => l.length > 0);
@@ -4484,13 +4494,14 @@ async function fetchIpsList() {
                 cachedIpsData[opName] = [...new Set(ips)];
             }
         });
-        if (Object.keys(cachedIpsData).length === 0) throw new Error('Empty list');
+        if (Object.keys(cachedIpsData).length === 0) throw new Error('Empty GitHub IP list');
         populateIpSelect();
     } catch (err) {
-        alert('لیست IP معتبر دریافت نشد. اگر متن HTML دیدی یعنی Worker هنوز نسخه قدیمی را اجرا می‌کند یا مسیر /api/clean-ips به پنل برمی‌گردد.');
+        alert('لیست IP از GitHub دریافت نشد. فقط این فایل خوانده می‌شود: ' + DLBPANEL_IPS_GITHUB_BLOB_URL);
         toggleIpSelectorModal(false);
     }
 }
+
 function populateIpSelect() {
     const select = document.getElementById('ip-operator-select');
     select.innerHTML = '<option value="all">All</option>';
