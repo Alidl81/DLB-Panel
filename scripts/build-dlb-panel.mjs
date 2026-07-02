@@ -95,12 +95,13 @@ function basicBranding(code) {
 
 function patchPanelSpecific(code) {
   let out = basicBranding(code);
+  const purchaseRemark = JSON.stringify(config.purchaseConfigRemark || `برای خرید به تلگرام @${config.telegramUsername} مراجعه کنید`);
 
   // The original subscription service inserts two promotional configs before user configs.
   // Replace them with one clean owner config containing the requested Telegram ID.
   out = out.replace(
     /const m1 = decodeURIComponent\([^;]+;\s*const m2 = decodeURIComponent\([^;]+;\s*links\.push\(atob\("dmxlc3M6Ly8="\)[\s\S]*?encodeURIComponent\(m1\)\);\s*links\.push\(atob\("dmxlc3M6Ly8="\)[\s\S]*?encodeURIComponent\(m2\)\);/m,
-    `const m1 = "${config.brandName} | @${config.telegramUsername}";\n  links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=${encodedNewPath}#" + encodeURIComponent(m1));`
+    `const m1 = ${purchaseRemark};\n  links.push(atob("dmxlc3M6Ly8=") + user.uuid + "@0.0.0.0:1?encryption=none&security=none&type=ws&host=" + host + "&path=${encodedNewPath}#" + encodeURIComponent(m1));`
   );
 
   // Add the Telegram ID to every normal config remark so at least one produced config contains it.

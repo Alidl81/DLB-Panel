@@ -2,8 +2,8 @@
   "brandName": "DLB Panel",
   "ownerName": "Ali Doulabi",
   "telegramUsername": "Ali_dlb404",
-  "githubOwner": "YOUR_GITHUB_USERNAME",
-  "githubRepo": "dlb-panel",
+  "githubOwner": "Alidl81",
+  "githubRepo": "DLB-Panel",
   "workerPrefix": "dlb-panel",
   "dbPrefix": "dlb-db",
   "websocketPath": "DLB_Panel_Ali_dlb404",
@@ -12,5 +12,6 @@
     "panel": "https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/zeus.js",
     "deployer": "https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/zeus%20deployer.js",
     "ips": "https://raw.githubusercontent.com/IR-NETLIFY/zeus/refs/heads/main/ips.txt"
-  }
+  },
+  "purchaseConfigRemark": "برای خرید به تلگرام @Ali_dlb404 مراجعه کنید"
 }
