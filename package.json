@@ -1,0 +1,17 @@
+{
+  "name": "dlb-panel",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "description": "DLB Panel custom Cloudflare Workers project builder",
+  "scripts": {
+    "build": "node scripts/build-dlb-panel.mjs",
+    "verify": "node scripts/verify-dlb-output.mjs",
+    "prepare:github": "npm run build && npm run verify",
+    "deploy": "npm run build && npx wrangler deploy"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {}
+}

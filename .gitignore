@@ -1,0 +1,7 @@
+node_modules/
+.env
+.env.*
+.DS_Store
+.wrangler/
+.dev.vars
+# Upstream source files are intentionally committed so Cloudflare Git Deploy can build without fetching them at build time.
