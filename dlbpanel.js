@@ -73,7 +73,9 @@ function isDlbPanelSafeAddress(value, options = {}) {
 	const ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(":");
 	if (ipv4 || ipv6) return true;
 	if (!allowHost) return false;
-	return /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
+	const normalizedHost = line.endsWith(".") ? line.slice(0, -1) : line;
+	const hostLabels = normalizedHost.split(".");
+	return hostLabels.length > 1 && hostLabels.every((label) => /^[A-Za-z0-9-]{1,63}$/.test(label) && label[0] !== "-" && label[label.length - 1] !== "-");
 }
 
 function getDlbPanelCleanAddresses(rawText, options = {}) {
@@ -2370,7 +2372,7 @@ login: `<!DOCTYPE html>
             <div class="flex flex-row flex-wrap justify-center items-center gap-3 w-full md:w-auto">
                 <h1 class="text-lg font-bold flex items-center gap-2" dir="ltr">
                     DLB Panel 
-                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.13</span>
+                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.14</span>
                 </h1>
                 <div class="flex items-center gap-3 bg-gray-100 dark:bg-zinc-800/60 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800/80 shadow-sm flex-shrink-0 w-fit">
                     <a href="https://github.com/Alidl81/DLB-Panel" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="GitHub">
@@ -4331,7 +4333,7 @@ function editUser(encodedUsername) {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.5.13';
+const CURRENT_VERSION = '1.5.14';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -4443,7 +4445,9 @@ function isDlbPanelValidIpLine(line) {
     if (/[:\/]{2,}|\/|\?|#|&|=|,|;/.test(line)) return false;
     const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
     const ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(':');
-    const host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
+    const normalizedHost = line.endsWith('.') ? line.slice(0, -1) : line;
+    const hostLabels = normalizedHost.split('.');
+    const host = hostLabels.length > 1 && hostLabels.every(label => /^[A-Za-z0-9-]{1,63}$/.test(label) && label[0] !== '-' && label[label.length - 1] !== '-');
     return ipv4 || ipv6 || host;
 }
 
@@ -4858,7 +4862,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (/\.(?:css|js|html?|php|json|xml|svg|png|jpe?g|webp|ico)$/i.test(line)) return false;
             var ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
             var ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(':');
-            var host = /^(?=.{1,253}$)(?!-)[A-Za-z0-9-]{1,63}(?<!-)(?:\.(?!-)[A-Za-z0-9-]{1,63}(?<!-))+\.?$/.test(line);
+            var normalizedHost = line.endsWith('.') ? line.slice(0, -1) : line;
+            var hostLabels = normalizedHost.split('.');
+            var host = hostLabels.length > 1 && hostLabels.every(function(label) { return /^[A-Za-z0-9-]{1,63}$/.test(label) && label[0] !== '-' && label[label.length - 1] !== '-'; });
             return ipv4 || ipv6 || host;
         }
         function getVlessLink() {
