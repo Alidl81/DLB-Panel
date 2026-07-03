@@ -2635,20 +2635,6 @@ login: `<!DOCTYPE html>
         </button>
     </div>
 </div>
-<div id="free-panel-warning-modal" class="fixed inset-0 z-[85] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm opacity-0 pointer-events-none transition-all duration-300 ease-out">
-    <div class="w-full max-w-md bg-white dark:bg-amoled-card border border-rose-500/50 rounded-3xl shadow-2xl overflow-hidden p-6 text-center transition-all transform duration-300 opacity-0 scale-95 ease-out">
-        <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-rose-100 dark:bg-rose-900/30 text-rose-500 mb-4 shadow-inner">
-            <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
-        </div>
-        <h3 class="font-black text-xl text-gray-900 dark:text-white mb-2">پیام همگانی</h3>
-        <p class="text-sm text-gray-600 dark:text-gray-400 mb-6 leading-relaxed font-medium">
-            خرید با کمترین قیمت از <span class="text-rose-500 font-bold" dir="ltr">@Ali_dlb404</span> در تلگرام
-        </p>
-        <button onclick="closeFreePanelWarning()" class="w-full py-3.5 bg-rose-600 hover:bg-rose-700 text-white font-black rounded-xl text-sm transition duration-300 shadow-lg shadow-rose-500/25">
-            تأیید و موافقت
-        </button>
-    </div>
-</div>
     <div id="user-modal" class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 opacity-0 pointer-events-none transition-opacity duration-200 ease-out">
         <div id="user-modal-card" class="w-full max-w-xl bg-white dark:bg-zinc-950 border border-gray-200 dark:border-zinc-800 rounded-2xl shadow-xl overflow-hidden transition-[opacity,transform] duration-200 opacity-0 scale-95 ease-out flex flex-col max-h-[90vh] transform-gpu" style="will-change: transform, opacity;">
             <div class="px-6 py-4 border-b border-gray-150 dark:border-zinc-800/80 flex justify-between items-center bg-gray-50/50 dark:bg-zinc-900/30">
@@ -3935,14 +3921,6 @@ function openUsageWarning() {
     card.classList.remove('opacity-0', 'scale-95');
     card.classList.add('opacity-100', 'scale-100');
 }
-function closeFreePanelWarning() {
-    const modal = document.getElementById('free-panel-warning-modal');
-    const card = modal.querySelector('div');
-    modal.classList.remove('opacity-100', 'pointer-events-auto');
-    modal.classList.add('opacity-0', 'pointer-events-none');
-    card.classList.remove('opacity-100', 'scale-100');
-    card.classList.add('opacity-0', 'scale-95');
-}
         function getVlessLink(username) {
             const user = window.allUsers.find(u => u.username === username);
             if (!user) return '';
@@ -4351,7 +4329,7 @@ function editUser(encodedUsername) {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.5.6';
+const CURRENT_VERSION = '1.5.12';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -4481,16 +4459,92 @@ function cleanDlbPanelTextareaIps(value) {
     return out.join('\n');
 }
 
+const DLBPANEL_IPS_CACHE_KEY = 'dlbpanel_daily_ips_cache_v2';
+const DLBPANEL_IPS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+function parseDlbPanelIpsText(text) {
+    if (isDlbPanelHtmlText(text)) throw new Error('GitHub returned HTML instead of ips.txt');
+    const grouped = {};
+    let opName = 'All';
+    const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trim());
+    for (const line of lines) {
+        if (!line) continue;
+        if (line.startsWith('#')) {
+            opName = line.replace(/^#+/, '').trim() || opName;
+            if (!grouped[opName]) grouped[opName] = [];
+            continue;
+        }
+        if (line.startsWith('----------') || line.startsWith('[source')) continue;
+        if (!isDlbPanelValidIpLine(line)) continue;
+        if (!grouped[opName]) grouped[opName] = [];
+        grouped[opName].push(line);
+    }
+    Object.keys(grouped).forEach(key => {
+        grouped[key] = [...new Set(grouped[key])].filter(isDlbPanelValidIpLine);
+        if (grouped[key].length === 0) delete grouped[key];
+    });
+    if (Object.keys(grouped).length === 0) throw new Error('No valid IPs in ips.txt');
+    return grouped;
+}
+
+function readDlbPanelIpsCache() {
+    try {
+        const raw = localStorage.getItem(DLBPANEL_IPS_CACHE_KEY);
+        if (!raw) return null;
+        const cache = JSON.parse(raw);
+        if (!cache || !cache.data || typeof cache.fetchedAt !== 'number') return null;
+        const normalized = {};
+        Object.keys(cache.data).forEach(key => {
+            const ips = Array.isArray(cache.data[key]) ? cache.data[key] : [];
+            const cleanIps = [...new Set(ips.map(String).map(x => x.trim()).filter(isDlbPanelValidIpLine))];
+            if (cleanIps.length) normalized[key] = cleanIps;
+        });
+        if (Object.keys(normalized).length === 0) return null;
+        return { fetchedAt: cache.fetchedAt, data: normalized };
+    } catch (e) {
+        return null;
+    }
+}
+
+function saveDlbPanelIpsCache(data) {
+    try {
+        localStorage.setItem(DLBPANEL_IPS_CACHE_KEY, JSON.stringify({
+            fetchedAt: Date.now(),
+            source: DLBPANEL_IPS_GITHUB_BLOB_URL,
+            rawSource: DLBPANEL_IPS_GITHUB_RAW_URL,
+            data
+        }));
+    } catch (e) {}
+}
+
+function useDlbPanelIpsData(data) {
+    cachedIpsData = {};
+    Object.keys(data || {}).forEach(key => {
+        const cleanIps = [...new Set((data[key] || []).map(String).map(x => x.trim()).filter(isDlbPanelValidIpLine))];
+        if (cleanIps.length) cachedIpsData[key] = cleanIps;
+    });
+    if (Object.keys(cachedIpsData).length === 0) throw new Error('No cached valid IPs');
+    populateIpSelect();
+}
+
 async function fetchIpsList() {
     const ipBox = document.getElementById('input-ips');
-    // اگر از دفعات قبلی HTML داخل فیلد مانده، همان لحظه پاکش کن.
     if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
+
+    const cache = readDlbPanelIpsCache();
+    const cacheIsFresh = cache && (Date.now() - cache.fetchedAt) < DLBPANEL_IPS_CACHE_TTL_MS;
+
+    // دقیقاً مثل applySelectedIps، فقط از آرایه‌ی تمیز استفاده می‌کنیم؛ اگر cache امروز تازه باشد، دوباره سراغ GitHub نمی‌رویم.
+    if (cacheIsFresh) {
+        useDlbPanelIpsData(cache.data);
+        return;
+    }
+
     try {
-        // فقط و فقط متن خام همین فایل GitHub خوانده می‌شود؛ هیچ مسیر داخلی پنل/Worker استفاده نمی‌شود.
         const response = await fetch(DLBPANEL_IPS_GITHUB_RAW_URL + '?t=' + Date.now(), {
             cache: 'no-store',
             redirect: 'follow',
-            headers: { 'Accept': 'text/plain' }
+            headers: { 'Accept': 'text/plain, */*;q=0.1' }
         });
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
@@ -4498,35 +4552,23 @@ async function fetchIpsList() {
         if (/text\/html/i.test(contentType) || isDlbPanelHtmlText(text)) {
             throw new Error('GitHub returned HTML instead of ips.txt');
         }
-        const lines = text.replace(/\r/g, '').split('\n').map(l => l.trim());
-        cachedIpsData = {};
-        let opName = 'All';
-        for (const line of lines) {
-            if (!line) continue;
-            if (line.startsWith('#')) {
-                opName = line.replace(/^#+/, '').trim() || opName;
-                if (!cachedIpsData[opName]) cachedIpsData[opName] = [];
-                continue;
-            }
-            if (line.startsWith('----------') || line.startsWith('[source')) continue;
-            if (!isDlbPanelValidIpLine(line)) continue;
-            if (!cachedIpsData[opName]) cachedIpsData[opName] = [];
-            cachedIpsData[opName].push(line);
-        }
-        Object.keys(cachedIpsData).forEach(key => {
-            cachedIpsData[key] = [...new Set(cachedIpsData[key])];
-            if (cachedIpsData[key].length === 0) delete cachedIpsData[key];
-        });
-        if (Object.keys(cachedIpsData).length === 0) throw new Error('No valid IPs in ips.txt');
-        populateIpSelect();
+        const parsed = parseDlbPanelIpsText(text);
+        const oldData = cache ? JSON.stringify(cache.data) : '';
+        const newData = JSON.stringify(parsed);
+        if (oldData !== newData || !cache) saveDlbPanelIpsCache(parsed);
+        useDlbPanelIpsData(parsed);
     } catch (err) {
+        // اگر GitHub یا اینترنت مشکل داشت، از آخرین IPهای سالم ذخیره‌شده استفاده کن؛ HTML هرگز وارد textarea نمی‌شود.
+        if (cache && cache.data) {
+            useDlbPanelIpsData(cache.data);
+            return;
+        }
         if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
-        alert('دریافت IP از GitHub ناموفق بود. فقط این فایل خوانده می‌شود:\n' + DLBPANEL_IPS_GITHUB_BLOB_URL + '\n\nخطا: ' + (err.message || err));
+        alert('دریافت IP از GitHub ناموفق بود و cache سالمی هم وجود ندارد. فقط این فایل باید خوانده شود:\n' + DLBPANEL_IPS_GITHUB_BLOB_URL + '\n\nخطا: ' + (err.message || err));
         toggleIpSelectorModal(false);
         throw err;
     }
 }
-
 function populateIpSelect() {
     const select = document.getElementById('ip-operator-select');
     select.innerHTML = '<option value="all">All</option>';
@@ -4592,12 +4634,6 @@ function applySelectedIps() {
     toggleIpSelectorModal(false);
 }
 document.addEventListener('DOMContentLoaded', () => {
-			const freeModal = document.getElementById('free-panel-warning-modal');
-            const freeCard = freeModal.querySelector('div');
-            freeModal.classList.remove('opacity-0', 'pointer-events-none');
-            freeModal.classList.add('opacity-100', 'pointer-events-auto');
-            freeCard.classList.remove('opacity-0', 'scale-95');
-            freeCard.classList.add('opacity-100', 'scale-100');
             if (localStorage.getItem('dlbpanel_path_warned_' + CURRENT_VERSION) !== 'true') {
                 const modal = document.getElementById('path-warning-modal');
                 const card = modal.querySelector('div');

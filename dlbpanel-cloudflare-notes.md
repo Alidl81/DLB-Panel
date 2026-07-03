@@ -23,3 +23,10 @@ npm run deploy
 
 - Root path `/` now redirects to `/panel` so opening the Worker base URL does not expose the landing-page HTML.
 - Clean IP loading now goes through `/api/clean-ips`. The pinned source is only `https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt`; the Worker converts that blob URL to the raw file URL internally and rejects HTML responses.
+
+
+## نسخه 1.5.12
+
+- مخزن IP فقط از لینک GitHub خواسته‌شده خوانده می‌شود و در مرورگر به raw تبدیل می‌شود.
+- cache روزانه اضافه شده است تا اگر GitHub تغییر نکرده بود، همان IPهای سالم قبلی استفاده شوند.
+- پاپ‌آپ پیام همگانی حذف شده است.
