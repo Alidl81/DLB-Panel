@@ -2372,7 +2372,7 @@ login: `<!DOCTYPE html>
             <div class="flex flex-row flex-wrap justify-center items-center gap-3 w-full md:w-auto">
                 <h1 class="text-lg font-bold flex items-center gap-2" dir="ltr">
                     DLB Panel 
-                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.14</span>
+                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.15-compat</span>
                 </h1>
                 <div class="flex items-center gap-3 bg-gray-100 dark:bg-zinc-800/60 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800/80 shadow-sm flex-shrink-0 w-fit">
                     <a href="https://github.com/Alidl81/DLB-Panel" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="GitHub">
@@ -4333,7 +4333,7 @@ function editUser(encodedUsername) {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.5.14';
+const CURRENT_VERSION = '1.5.15';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -4430,49 +4430,109 @@ const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 let cachedIpsData = {};
 const DLBPANEL_IPS_GITHUB_BLOB_URL = 'https://github.com/IR-NETLIFY/zeus/blob/main/ips.txt';
 const DLBPANEL_IPS_GITHUB_RAW_URL = 'https://raw.githubusercontent.com/IR-NETLIFY/zeus/main/ips.txt';
+const DLBPANEL_LF = String.fromCharCode(10);
+const DLBPANEL_CR = String.fromCharCode(13);
+const DLBPANEL_BS = String.fromCharCode(92);
 
 function isDlbPanelHtmlText(text) {
-    return /<(?:!doctype|html|head|body|script|style|link|meta|div|p|button|span|svg)\b/i.test(String(text || '')) ||
-        /(?:برای ورود به پنل|ورود به پنل|tailwind\.config|fontFamily|darkMode|theme\s*:|extend\s*:|Vazirmatn)/i.test(String(text || ''));
+    const s = String(text || '').toLowerCase();
+    const needles = ['<!doctype', '<html', '<head', '<body', '<script', '<style', '<link', '<meta', '<div', '<p', '<button', '<span', '<svg', 'برای ورود به پنل', 'ورود به پنل', 'tailwind.config', 'fontfamily', 'darkmode', 'theme:', 'extend:', 'vazirmatn'];
+    return needles.some(function(n) { return s.indexOf(n.toLowerCase()) !== -1; });
+}
+
+function dlbPanelOnlyDigits(value) {
+    if (!value) return false;
+    for (let i = 0; i < value.length; i++) {
+        const code = value.charCodeAt(i);
+        if (code < 48 || code > 57) return false;
+    }
+    return true;
+}
+
+function dlbPanelIsIpv4(line) {
+    const parts = line.split('.');
+    if (parts.length !== 4) return false;
+    return parts.every(function(part) {
+        if (!dlbPanelOnlyDigits(part)) return false;
+        if (part.length > 1 && part[0] === '0') return false;
+        const n = Number(part);
+        return n >= 0 && n <= 255;
+    });
+}
+
+function dlbPanelIsIpv6(line) {
+    if (line.indexOf(':') === -1) return false;
+    for (let i = 0; i < line.length; i++) {
+        const c = line[i].toLowerCase();
+        const isHex = (c >= '0' && c <= '9') || (c >= 'a' && c <= 'f') || c === ':';
+        if (!isHex) return false;
+    }
+    const parts = line.split(':');
+    if (parts.length < 3 || parts.length > 8) return false;
+    return parts.every(function(part) { return part.length <= 4; });
+}
+
+function dlbPanelIsHostname(line) {
+    const normalized = line.endsWith('.') ? line.slice(0, -1) : line;
+    if (!normalized || normalized.length > 253 || normalized.indexOf('.') === -1) return false;
+    const labels = normalized.split('.');
+    return labels.every(function(label) {
+        if (!label || label.length > 63) return false;
+        if (label[0] === '-' || label[label.length - 1] === '-') return false;
+        for (let i = 0; i < label.length; i++) {
+            const c = label[i];
+            const ok = (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c === '-';
+            if (!ok) return false;
+        }
+        return true;
+    });
 }
 
 function isDlbPanelValidIpLine(line) {
     line = String(line || '').trim();
     if (!line || line.length > 253) return false;
-    if (/[<>{}\[\]"'\\]/.test(line)) return false;
-    if (/\s/.test(line)) return false;
-    if (/(?:html|head|body|script|style|div|span|meta|link|class|href|tailwind|theme|extend|charset|stylesheet|vazirmatn|button|panel)/i.test(line)) return false;
-    if (/[:\/]{2,}|\/|\?|#|&|=|,|;/.test(line)) return false;
-    const ipv4 = /^(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)$/.test(line);
-    const ipv6 = /^(?:[0-9a-fA-F]{0,4}:){2,7}[0-9a-fA-F]{0,4}$/.test(line) && line.includes(':');
-    const normalizedHost = line.endsWith('.') ? line.slice(0, -1) : line;
-    const hostLabels = normalizedHost.split('.');
-    const host = hostLabels.length > 1 && hostLabels.every(label => /^[A-Za-z0-9-]{1,63}$/.test(label) && label[0] !== '-' && label[label.length - 1] !== '-');
-    return ipv4 || ipv6 || host;
+    const invalidChars = ['<', '>', '{', '}', '[', ']', '"', "'", DLBPANEL_BS, '/', '?', '#', '&', '=', ',', ';'];
+    for (let i = 0; i < invalidChars.length; i++) {
+        if (line.indexOf(invalidChars[i]) !== -1) return false;
+    }
+    for (let i = 0; i < line.length; i++) {
+        if (line.charCodeAt(i) <= 32) return false;
+    }
+    const lower = line.toLowerCase();
+    const badWords = ['html', 'head', 'body', 'script', 'style', 'div', 'span', 'meta', 'link', 'class', 'href', 'tailwind', 'theme', 'extend', 'charset', 'stylesheet', 'vazirmatn', 'button', 'panel'];
+    for (let i = 0; i < badWords.length; i++) {
+        if (lower.indexOf(badWords[i]) !== -1) return false;
+    }
+    if (line.indexOf('://') !== -1) return false;
+    return dlbPanelIsIpv4(line) || dlbPanelIsIpv6(line) || dlbPanelIsHostname(line);
 }
 
 function cleanDlbPanelTextareaIps(value) {
     const seen = new Set();
     const out = [];
-    String(value || '').replace(/\r/g, '').split(/[\n,;]+/).forEach(raw => {
-        const line = raw.trim();
-        if (!isDlbPanelValidIpLine(line)) return;
-        const key = line.toLowerCase();
-        if (seen.has(key)) return;
-        seen.add(key);
-        out.push(line);
+    String(value || '').split(DLBPANEL_CR).join('').split(DLBPANEL_LF).forEach(function(raw) {
+        raw.split(',').forEach(function(piece) {
+            piece.split(';').forEach(function(part) {
+                const line = part.trim();
+                if (!isDlbPanelValidIpLine(line)) return;
+                const key = line.toLowerCase();
+                if (seen.has(key)) return;
+                seen.add(key);
+                out.push(line);
+            });
+        });
     });
-    return out.join('\n');
+    return out.join(DLBPANEL_LF);
 }
 
-const DLBPANEL_IPS_CACHE_KEY = 'dlbpanel_daily_ips_cache_v2';
+const DLBPANEL_IPS_CACHE_KEY = 'dlbpanel_daily_ips_cache_v3';
 const DLBPANEL_IPS_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 function parseDlbPanelIpsText(text) {
     if (isDlbPanelHtmlText(text)) throw new Error('GitHub returned HTML instead of ips.txt');
     const grouped = {};
     let opName = 'All';
-    const lines = String(text || '').replace(/\r/g, '').split('\n').map(l => l.trim());
+    const lines = String(text || '').split(DLBPANEL_CR).join('').split(DLBPANEL_LF).map(function(l) { return l.trim(); });
     for (const line of lines) {
         if (!line) continue;
         if (line.startsWith('#')) {
@@ -4485,8 +4545,8 @@ function parseDlbPanelIpsText(text) {
         if (!grouped[opName]) grouped[opName] = [];
         grouped[opName].push(line);
     }
-    Object.keys(grouped).forEach(key => {
-        grouped[key] = [...new Set(grouped[key])].filter(isDlbPanelValidIpLine);
+    Object.keys(grouped).forEach(function(key) {
+        grouped[key] = Array.from(new Set(grouped[key])).filter(isDlbPanelValidIpLine);
         if (grouped[key].length === 0) delete grouped[key];
     });
     if (Object.keys(grouped).length === 0) throw new Error('No valid IPs in ips.txt');
@@ -4500,9 +4560,9 @@ function readDlbPanelIpsCache() {
         const cache = JSON.parse(raw);
         if (!cache || !cache.data || typeof cache.fetchedAt !== 'number') return null;
         const normalized = {};
-        Object.keys(cache.data).forEach(key => {
+        Object.keys(cache.data).forEach(function(key) {
             const ips = Array.isArray(cache.data[key]) ? cache.data[key] : [];
-            const cleanIps = [...new Set(ips.map(String).map(x => x.trim()).filter(isDlbPanelValidIpLine))];
+            const cleanIps = Array.from(new Set(ips.map(String).map(function(x) { return x.trim(); }).filter(isDlbPanelValidIpLine)));
             if (cleanIps.length) normalized[key] = cleanIps;
         });
         if (Object.keys(normalized).length === 0) return null;
@@ -4525,8 +4585,8 @@ function saveDlbPanelIpsCache(data) {
 
 function useDlbPanelIpsData(data) {
     cachedIpsData = {};
-    Object.keys(data || {}).forEach(key => {
-        const cleanIps = [...new Set((data[key] || []).map(String).map(x => x.trim()).filter(isDlbPanelValidIpLine))];
+    Object.keys(data || {}).forEach(function(key) {
+        const cleanIps = Array.from(new Set((data[key] || []).map(String).map(function(x) { return x.trim(); }).filter(isDlbPanelValidIpLine)));
         if (cleanIps.length) cachedIpsData[key] = cleanIps;
     });
     if (Object.keys(cachedIpsData).length === 0) throw new Error('No cached valid IPs');
@@ -4536,16 +4596,12 @@ function useDlbPanelIpsData(data) {
 async function fetchIpsList() {
     const ipBox = document.getElementById('input-ips');
     if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
-
     const cache = readDlbPanelIpsCache();
     const cacheIsFresh = cache && (Date.now() - cache.fetchedAt) < DLBPANEL_IPS_CACHE_TTL_MS;
-
-    // دقیقاً مثل applySelectedIps، فقط از آرایه‌ی تمیز استفاده می‌کنیم؛ اگر cache امروز تازه باشد، دوباره سراغ GitHub نمی‌رویم.
     if (cacheIsFresh) {
         useDlbPanelIpsData(cache.data);
         return;
     }
-
     try {
         const response = await fetch(DLBPANEL_IPS_GITHUB_RAW_URL + '?t=' + Date.now(), {
             cache: 'no-store',
@@ -4555,7 +4611,7 @@ async function fetchIpsList() {
         const contentType = response.headers.get('content-type') || '';
         const text = await response.text();
         if (!response.ok) throw new Error('GitHub fetch failed: ' + response.status);
-        if (/text\/html/i.test(contentType) || isDlbPanelHtmlText(text)) {
+        if (contentType.toLowerCase().indexOf('text/html') !== -1 || isDlbPanelHtmlText(text)) {
             throw new Error('GitHub returned HTML instead of ips.txt');
         }
         const parsed = parseDlbPanelIpsText(text);
@@ -4564,13 +4620,12 @@ async function fetchIpsList() {
         if (oldData !== newData || !cache) saveDlbPanelIpsCache(parsed);
         useDlbPanelIpsData(parsed);
     } catch (err) {
-        // اگر GitHub یا اینترنت مشکل داشت، از آخرین IPهای سالم ذخیره‌شده استفاده کن؛ HTML هرگز وارد textarea نمی‌شود.
         if (cache && cache.data) {
             useDlbPanelIpsData(cache.data);
             return;
         }
         if (ipBox && isDlbPanelHtmlText(ipBox.value)) ipBox.value = '';
-        alert('دریافت IP از GitHub ناموفق بود و cache سالمی هم وجود ندارد. فقط این فایل باید خوانده شود:\n' + DLBPANEL_IPS_GITHUB_BLOB_URL + '\n\nخطا: ' + (err.message || err));
+        alert('دریافت IP از GitHub ناموفق بود و cache سالمی هم وجود ندارد. فقط این فایل باید خوانده شود:' + DLBPANEL_LF + DLBPANEL_IPS_GITHUB_BLOB_URL + DLBPANEL_LF + DLBPANEL_LF + 'خطا: ' + (err.message || err));
         toggleIpSelectorModal(false);
         throw err;
     }
@@ -4578,7 +4633,7 @@ async function fetchIpsList() {
 function populateIpSelect() {
     const select = document.getElementById('ip-operator-select');
     select.innerHTML = '<option value="all">All</option>';
-    Object.keys(cachedIpsData).forEach(op => {
+    Object.keys(cachedIpsData).forEach(function(op) {
         const option = document.createElement('option');
         option.value = op;
         option.textContent = op;
@@ -4620,11 +4675,11 @@ function applySelectedIps() {
     if (isNaN(count) || count < 1) count = 10;
     let availableIps = [];
     if (operator === 'all') {
-        Object.values(cachedIpsData).forEach(ips => { availableIps = availableIps.concat(ips); });
+        Object.values(cachedIpsData).forEach(function(ips) { availableIps = availableIps.concat(ips); });
     } else {
         availableIps = cachedIpsData[operator] || [];
     }
-    availableIps = [...new Set(availableIps)].filter(isDlbPanelValidIpLine);
+    availableIps = Array.from(new Set(availableIps)).filter(isDlbPanelValidIpLine);
     let selectedIps = [];
     if (count >= availableIps.length) {
         selectedIps = availableIps;
@@ -4632,11 +4687,13 @@ function applySelectedIps() {
         const shuffled = availableIps.slice();
         for (let i = shuffled.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+            const tmp = shuffled[i];
+            shuffled[i] = shuffled[j];
+            shuffled[j] = tmp;
         }
         selectedIps = shuffled.slice(0, count);
     }
-    document.getElementById('input-ips').value = selectedIps.join('\n');
+    document.getElementById('input-ips').value = selectedIps.join(DLBPANEL_LF);
     toggleIpSelectorModal(false);
 }
 document.addEventListener('DOMContentLoaded', () => {
