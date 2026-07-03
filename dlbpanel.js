@@ -2370,7 +2370,7 @@ login: `<!DOCTYPE html>
             <div class="flex flex-row flex-wrap justify-center items-center gap-3 w-full md:w-auto">
                 <h1 class="text-lg font-bold flex items-center gap-2" dir="ltr">
                     DLB Panel 
-                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.11-raw-ips</span>
+                    <span id="panel-version" class="text-xs px-2 py-0.5 font-semibold bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 rounded-full">v1.5.13</span>
                 </h1>
                 <div class="flex items-center gap-3 bg-gray-100 dark:bg-zinc-800/60 px-3 py-1.5 rounded-full border border-gray-200 dark:border-zinc-800/80 shadow-sm flex-shrink-0 w-fit">
                     <a href="https://github.com/Alidl81/DLB-Panel" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover:text-gray-800 dark:text-gray-400 dark:hover:text-gray-200 transition-all transform hover:scale-125 duration-200 flex-shrink-0" title="GitHub">
@@ -3896,30 +3896,32 @@ async function resetUserData(encodedUsername, actionType) {
         }
 function closePathWarning() {
     const modal = document.getElementById('path-warning-modal');
+    if (!modal) return;
     const card = modal.querySelector('div');
     modal.classList.remove('opacity-100', 'pointer-events-auto');
     modal.classList.add('opacity-0', 'pointer-events-none');
-    card.classList.remove('opacity-100', 'scale-100');
-    card.classList.add('opacity-0', 'scale-95');
+    if (card) {
+        card.classList.remove('opacity-100', 'scale-100');
+        card.classList.add('opacity-0', 'scale-95');
+    }
     localStorage.setItem('dlbpanel_path_warned_' + CURRENT_VERSION, 'true');
 }
 function closeUsageWarning() {
     const modal = document.getElementById('usage-warning-modal');
+    if (!modal) return;
     const card = modal.querySelector('div');
     modal.classList.remove('opacity-100', 'pointer-events-auto');
     modal.classList.add('opacity-0', 'pointer-events-none');
-    card.classList.remove('opacity-100', 'scale-100');
-    card.classList.add('opacity-0', 'scale-95');
+    if (card) {
+        card.classList.remove('opacity-100', 'scale-100');
+        card.classList.add('opacity-0', 'scale-95');
+    }
     const today = new Date().toISOString().split('T')[0];
     localStorage.setItem('dlbpanel_usage_warned_date', today);
 }
 function openUsageWarning() {
-    const modal = document.getElementById('usage-warning-modal');
-    const card = modal.querySelector('div');
-    modal.classList.remove('opacity-0', 'pointer-events-none');
-    modal.classList.add('opacity-100', 'pointer-events-auto');
-    card.classList.remove('opacity-0', 'scale-95');
-    card.classList.add('opacity-100', 'scale-100');
+    // Popup disabled intentionally; keep UI clean and non-blocking.
+    return;
 }
         function getVlessLink(username) {
             const user = window.allUsers.find(u => u.username === username);
@@ -4329,7 +4331,7 @@ function editUser(encodedUsername) {
                 window.location.reload();
             }
         }
-const CURRENT_VERSION = '1.5.12';
+const CURRENT_VERSION = '1.5.13';
 const UPDATE_FIX = "constsCURRENT_VERSION='d.d.d'";
 		async function checkForUpdates(isManual = false) {
             try {
@@ -4634,22 +4636,27 @@ function applySelectedIps() {
     toggleIpSelectorModal(false);
 }
 document.addEventListener('DOMContentLoaded', () => {
-            if (localStorage.getItem('dlbpanel_path_warned_' + CURRENT_VERSION) !== 'true') {
-                const modal = document.getElementById('path-warning-modal');
-                const card = modal.querySelector('div');
-                modal.classList.remove('opacity-0', 'pointer-events-none');
-                modal.classList.add('opacity-100', 'pointer-events-auto');
-                card.classList.remove('opacity-0', 'scale-95');
-                card.classList.add('opacity-100', 'scale-100');
-            }			
-            const versionBadge = document.getElementById('panel-version');
-            if (versionBadge) versionBadge.innerText = 'v' + CURRENT_VERSION;
-            renderPortCheckboxes();
-            loadUsers();
-            loadLocations();
-            setInterval(() => loadUsers(true), 2000);
-            setTimeout(() => checkForUpdates(false), 2000);
-            setInterval(() => checkForUpdates(false), 60000);
+            try {
+                // No startup popups. Keep the panel usable even if an optional element is missing.
+                const versionBadge = document.getElementById('panel-version');
+                if (versionBadge) versionBadge.innerText = 'v' + CURRENT_VERSION;
+                if (typeof renderPortCheckboxes === 'function') renderPortCheckboxes();
+                if (typeof loadUsers === 'function') Promise.resolve(loadUsers()).catch(err => console.error('loadUsers failed:', err));
+                if (typeof loadLocations === 'function') Promise.resolve(loadLocations()).catch(err => console.error('loadLocations failed:', err));
+                setInterval(() => {
+                    if (typeof loadUsers === 'function') Promise.resolve(loadUsers(true)).catch(err => console.error('loadUsers refresh failed:', err));
+                }, 2000);
+                setTimeout(() => {
+                    if (typeof checkForUpdates === 'function') Promise.resolve(checkForUpdates(false)).catch(err => console.error('checkForUpdates failed:', err));
+                }, 2000);
+                setInterval(() => {
+                    if (typeof checkForUpdates === 'function') Promise.resolve(checkForUpdates(false)).catch(err => console.error('checkForUpdates refresh failed:', err));
+                }, 60000);
+            } catch (err) {
+                console.error('DLB Panel init failed:', err);
+                const versionBadge = document.getElementById('panel-version');
+                if (versionBadge) versionBadge.innerText = 'v' + CURRENT_VERSION + ' / init-error';
+            }
         });
     </script>
 </body>
