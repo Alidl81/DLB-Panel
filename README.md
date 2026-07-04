@@ -1,17 +1,5 @@
-<p align="center">
-  <img src="photos/dlbpanel-dark.png" width="100%" alt="DLB Panel" style="border-radius: 12px; margin-bottom: 15px;">
-</p>
 
-<table width="100%">
-  <tr>
-    <td width="50%" valign="middle" align="center"><img src="photos/dlbpanel-updater.png" width="100%" alt="DLB Panel Updater" style="border-radius: 12px;"></td>
-    <td width="50%" valign="middle" align="center"><img src="photos/dlbpanel-deployer.png" width="100%" alt="DLB Panel Deployer" style="border-radius: 12px;"></td>
-  </tr>
-  <tr>
-    <td width="50%" valign="middle" align="center"><img src="photos/dlbpanel-add.png" width="100%" alt="DLB Panel Add User" style="border-radius: 12px;"></td>
-    <td width="50%" valign="middle" align="center"><img src="photos/dlbpanel-status.png" width="100%" alt="DLB Panel Status" style="border-radius: 12px;"></td>
-  </tr>
-</table>
+
 
 <div align="center">
   <h1>⚡ DLB Panel for Cloudflare Workers</h1>
